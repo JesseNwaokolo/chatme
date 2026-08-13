@@ -10,15 +10,33 @@ interface PhoneNumberProps {
   setPhone: (phone: string) => void;
 }
 
-const PhoneNumber = ({ phone, setPhone }: PhoneNumberProps) => {
+const PhoneNumber = ({ setPhone }: PhoneNumberProps) => {
+  const [nationalNumber, setNationalNumber] = useState("");
   const [country, setCountry] = useState<ICountry | null>(null);
   const { theme } = useTheme();
+
+  const emitFullNumber = (digits: string, selectedCountry: ICountry | null) => {
+    const dialCode = selectedCountry?.idd?.root ?? "";
+    const nationalDigits = digits.replace(/\D/g, "");
+    setPhone(nationalDigits ? `${dialCode}${nationalDigits}` : "");
+  };
+
+  const handleChangePhoneNumber = (value: string) => {
+    setNationalNumber(value);
+    emitFullNumber(value, country);
+  };
+
+  const handleChangeCountry = (selectedCountry: ICountry) => {
+    setCountry(selectedCountry);
+    emitFullNumber(nationalNumber, selectedCountry);
+  };
+
   return (
     <PhoneInput
-      value={phone}
-      onChangePhoneNumber={setPhone}
+      value={nationalNumber}
+      onChangePhoneNumber={handleChangePhoneNumber}
       country={country}
-      onChangeCountry={setCountry}
+      onChangeCountry={handleChangeCountry}
       defaultCountry="NG"
       placeholder="Phone number"
       phoneInputStyles={{

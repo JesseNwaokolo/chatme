@@ -4,6 +4,7 @@ import { MySafeArea } from "@/src/shared/components/MySafeArea";
 import { StyledText } from "@/src/shared/components/StyledText";
 import { useTheme } from "@/src/theme/useTheme";
 import { Theme } from "@/src/theme/useThemeStore";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
@@ -13,17 +14,21 @@ const AddPhoneNumber = () => {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const [phone, setPhone] = useState("");
+  const router = useRouter();
 
   const onSubmit = () => {
     console.log(phone);
+    router.push({
+      pathname: "/(auth)/verify-otp",
+      params: { phone },
+    });
   };
 
   return (
     <MySafeArea
       style={styles.container}
-      edges={["top", "left", "right", "bottom"]}
     >
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={24}>
         <View style={styles.view}>
           {/* texts */}
           <View style={{ gap: 12 }}>
