@@ -20,7 +20,7 @@ const EnterName = () => {
   const [isFocused, setIsFocused] = useState(false);
 
   const onSubmit = () => {
-    console.log(name);
+    router.push("/(auth)/upload-photo");
   };
 
   return (
@@ -52,7 +52,9 @@ const EnterName = () => {
                 isFocused && styles.inputContainerFocused,
               ]}
             >
-              <PersonIcon color={isFocused ? theme.buttonPrimary : theme.textSecondary} />
+              <PersonIcon
+                color={isFocused ? theme.buttonPrimary : theme.textSecondary}
+              />
               <TextInput
                 value={name}
                 onChangeText={setName}

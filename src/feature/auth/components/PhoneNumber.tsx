@@ -41,10 +41,15 @@ const PhoneNumber = ({ setPhone }: PhoneNumberProps) => {
       placeholder="Phone number"
       phoneInputStyles={{
         divider: {
-          display: "none",
+          width: 0,
+          marginHorizontal: 0,
         },
         caret: {
-          display: "none",
+          width: 0,
+          height: 0,
+          borderWidth: 0,
+          padding: 0,
+          overflow: "hidden",
         },
         flagContainer: {
           backgroundColor: "transparent",

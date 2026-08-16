@@ -23,8 +23,8 @@ function resolveTheme(mode: Mode) {
 const useThemeStore = create<ThemeStore>()(
   persist(
     (set) => ({
-      theme: resolveTheme("system"),
-      mode: "system",
+      theme: resolveTheme("light"),
+      mode: "light",
       setMode: (mode: Mode) => {
         set({ mode, theme: resolveTheme(mode) });
       },
