@@ -14,6 +14,7 @@ import {
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
   loading?: boolean;
+  variant?: "primary" | "secondary";
 }
 
 export const Button = ({
@@ -21,10 +22,12 @@ export const Button = ({
   loading,
   disabled,
   style,
+  variant = "primary",
   ...rest
 }: ButtonProps) => {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
+  const isSecondary = variant === "secondary";
 
   return (
     <TouchableOpacity
@@ -32,15 +35,20 @@ export const Button = ({
       disabled={disabled || loading}
       style={[
         styles.button,
+        isSecondary && styles.buttonSecondary,
         (disabled || loading) && styles.buttonDisabled,
         style,
       ]}
       {...rest}
     >
       {loading ? (
-        <ActivityIndicator color={theme.buttonPrimaryText} />
+        <ActivityIndicator
+          color={isSecondary ? theme.buttonPrimary : theme.buttonPrimaryText}
+        />
       ) : (
-        <Text style={styles.text}>{title}</Text>
+        <Text style={[styles.text, isSecondary && styles.textSecondary]}>
+          {title}
+        </Text>
       )}
     </TouchableOpacity>
   );
@@ -56,6 +64,9 @@ const makeStyles = (theme: Theme) => {
       paddingVertical: 18,
       paddingHorizontal: 32,
     },
+    buttonSecondary: {
+      backgroundColor: theme.bgPrimaryLighter,
+    },
     buttonDisabled: {
       opacity: 0.5,
     },
@@ -64,6 +75,9 @@ const makeStyles = (theme: Theme) => {
       fontFamily: fonts.bold,
       fontSize: getScaledFontSize(14),
       lineHeight: getLineHeight(14),
+    },
+    textSecondary: {
+      color: theme.buttonPrimary,
     },
   });
 };

@@ -20,6 +20,7 @@ const UploadPhoto = () => {
 
   const onSubmit = () => {
     console.log(photo);
+    router.push("/(app)/chats");
   };
 
   return (
@@ -86,7 +87,7 @@ const makeStyles = (theme: Theme) => {
     imageWrapper: {
       alignItems: "center",
       justifyContent: "center",
-      flex : 1
+      flex: 1,
     },
     placeholder: {
       width: 164,

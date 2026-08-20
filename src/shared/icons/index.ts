@@ -1,5 +1,17 @@
+export { default as ArchiveIcon } from "./archive";
+export { default as BackspaceIcon } from "./backspace";
+export { default as CallIcon } from "./call";
 export { default as CameraIcon } from "./camera";
+export { default as ChatIcon } from "./chat";
 export { default as ChatMeIcon } from "./chatmeIcon";
 export { default as ChevronLeftIcon } from "./chevron-left";
+export { default as DeleteIcon } from "./delete";
 export { default as GalleryIcon } from "./gallery";
+export { default as LockIcon } from "./lock";
+export { default as MoreIcon } from "./more";
+export { default as MuteIcon } from "./mute";
 export { default as PersonIcon } from "./person";
+export { default as PinIcon } from "./pin";
+export { default as PlusIcon } from "./plus";
+export { default as SearchIcon } from "./search";
+export { default as SettingsIcon } from "./settings";
