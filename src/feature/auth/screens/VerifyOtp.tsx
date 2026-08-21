@@ -4,26 +4,48 @@ import { Button } from "@/src/shared/components/Button";
 import { MySafeArea } from "@/src/shared/components/MySafeArea";
 import { StyledText } from "@/src/shared/components/StyledText";
 import { ChevronLeftIcon } from "@/src/shared/icons";
+import useAuthStore from "@/src/store/useAuthStore";
+import useUserStore from "@/src/store/useUserStore";
 import { useTheme } from "@/src/theme/useTheme";
 import { Theme } from "@/src/theme/useThemeStore";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import Toast from "react-native-toast-message";
+import { useResendOtp } from "../api/useResendOtp";
+import { useVerifyOtp } from "../api/useVerifyOtp";
 import OTP, { OTP_LENGTH } from "../components/OTP";
+import { getDeviceInfo } from "../utils/getDeviceInfo";
 
 const RESEND_SECONDS = 24;
 
 interface VerifyOtpProps {
   phone: string;
+  challengeId?: string;
+  phoneNumberMasked?: string;
+  expiresInSeconds?: string;
+  resendInSeconds?: string;
+  codeLength?: string;
 }
 
-export default function VerifyOtp({ phone }: VerifyOtpProps) {
+export default function VerifyOtp({
+  phone,
+  challengeId,
+  resendInSeconds,
+}: VerifyOtpProps) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const router = useRouter();
   const [otpValue, setOtpValue] = useState("");
-  const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
+  const [secondsLeft, setSecondsLeft] = useState(
+    Number(resendInSeconds) || RESEND_SECONDS,
+  );
+  const [currentChallengeId, setCurrentChallengeId] = useState(challengeId);
+  const { mutate: resend, isPending: isResending } = useResendOtp();
+  const { mutate: verify, isPending: isVerifying } = useVerifyOtp();
+  const setTokens = useAuthStore((s) => s.setTokens);
+  const setUser = useUserStore((s) => s.setUser);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -33,16 +55,61 @@ export default function VerifyOtp({ phone }: VerifyOtpProps) {
   }, []);
 
   const onResend = () => {
-    console.log("resend otp");
-    setSecondsLeft(RESEND_SECONDS);
+    if (!currentChallengeId) return;
+    resend(
+      { challengeId: currentChallengeId },
+      {
+        onSuccess: (data) => {
+          setCurrentChallengeId(data.challengeId);
+          setSecondsLeft(data.resendInSeconds);
+          Toast.show({
+            type: "success",
+            text1: `Code sent to ${data.phoneNumberMasked}`,
+            text2: "Your code: 1234",
+            visibilityTime: 8000,
+          });
+        },
+        onError: (error) => {
+          Toast.show({
+            type: "error",
+            text1: "Couldn't resend code",
+            text2: error.message,
+          });
+        },
+      },
+    );
   };
 
   const onSubmit = () => {
-    console.log(otpValue);
-    router.push({
-      pathname: "/(auth)/enter-name",
-      params: { phone },
-    });
+    if (!currentChallengeId) return;
+    verify(
+      {
+        challengeId: currentChallengeId,
+        code: otpValue,
+        device: getDeviceInfo(),
+      },
+      {
+        onSuccess: (data) => {
+          setTokens({
+            accessToken: data.accessToken,
+            refreshToken: data.refreshToken,
+          });
+          setUser(data.user);
+          if (data.user.profileComplete) {
+            router.replace("/(app)/chats");
+          } else {
+            router.push({ pathname: "/(auth)/enter-name" });
+          }
+        },
+        onError: (error) => {
+          Toast.show({
+            type: "error",
+            text1: "Couldn't verify code",
+            text2: error.message,
+          });
+        },
+      },
+    );
   };
 
   return (
@@ -77,8 +144,14 @@ export default function VerifyOtp({ phone }: VerifyOtpProps) {
               seconds.
             </StyledText>
             {secondsLeft === 0 && (
-              <Pressable hitSlop={20} onPress={onResend}>
-                <StyledText style={styles.resendCode}>Resend code</StyledText>
+              <Pressable
+                hitSlop={20}
+                onPress={onResend}
+                disabled={isResending}
+              >
+                <StyledText style={styles.resendCode}>
+                  {isResending ? "Resending..." : "Resend code"}
+                </StyledText>
               </Pressable>
             )}
           </View>
@@ -86,7 +159,8 @@ export default function VerifyOtp({ phone }: VerifyOtpProps) {
         <Button
           title="Next"
           style={{ marginBottom: 6 }}
-          disabled={otpValue.length < OTP_LENGTH}
+          disabled={otpValue.length < OTP_LENGTH || isVerifying}
+          loading={isVerifying}
           onPress={onSubmit}
         />
       </KeyboardAvoidingView>

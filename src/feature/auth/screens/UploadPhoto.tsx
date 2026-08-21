@@ -3,24 +3,60 @@ import { Button } from "@/src/shared/components/Button";
 import { MySafeArea } from "@/src/shared/components/MySafeArea";
 import { StyledText } from "@/src/shared/components/StyledText";
 import { ChevronLeftIcon } from "@/src/shared/icons";
+import useUserStore from "@/src/store/useUserStore";
 import { useTheme } from "@/src/theme/useTheme";
 import { Theme } from "@/src/theme/useThemeStore";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import Toast from "react-native-toast-message";
+import { useUpdateProfile } from "../api/useUpdateProfile";
 import PhotoPickerSheet from "../components/PhotoPickerSheet";
+import { uploadAvatar } from "../utils/uploadAvatar";
 
-const UploadPhoto = () => {
+interface UploadPhotoProps {
+  displayName: string;
+}
+
+const UploadPhoto = ({ displayName }: UploadPhotoProps) => {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const router = useRouter();
   const [photo, setPhoto] = useState<string | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
+  const { mutate: updateProfile, isPending } = useUpdateProfile();
+  const setUser = useUserStore((s) => s.setUser);
 
-  const onSubmit = () => {
-    console.log(photo);
-    router.push("/(app)/chats");
+  const onSubmit = async () => {
+    if (!photo) return;
+    let avatarUrl: string;
+    try {
+      avatarUrl = await uploadAvatar(photo);
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Couldn't upload photo",
+        text2: error instanceof Error ? error.message : undefined,
+      });
+      return;
+    }
+    updateProfile(
+      { displayName, avatarUrl },
+      {
+        onSuccess: (user) => {
+          setUser(user);
+          router.replace("/(app)/chats");
+        },
+        onError: (error) => {
+          Toast.show({
+            type: "error",
+            text1: "Couldn't save profile",
+            text2: error.message,
+          });
+        },
+      },
+    );
   };
 
   return (
@@ -49,6 +85,8 @@ const UploadPhoto = () => {
       <Button
         title={photo ? "Next" : "Upload Photo"}
         style={{ marginBottom: 6 }}
+        disabled={isPending}
+        loading={photo ? isPending : false}
         onPress={photo ? onSubmit : () => setSheetVisible(true)}
       />
       <PhotoPickerSheet
