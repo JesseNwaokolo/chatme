@@ -20,7 +20,10 @@ const EnterName = () => {
   const [isFocused, setIsFocused] = useState(false);
 
   const onSubmit = () => {
-    router.push("/(auth)/upload-photo");
+    router.push({
+      pathname: "/(auth)/upload-photo",
+      params: { displayName: name },
+    });
   };
 
   return (
