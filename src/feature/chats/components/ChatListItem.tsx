@@ -15,7 +15,7 @@ import Swipeable, {
   SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
 import { Chat } from "../types";
-import { Avatar } from "./Avatar"; 
+import { Avatar } from "@/src/shared/components/Avatar";
 import { SwipeActionButton } from "./SwipeActionButton";
 
 interface ChatListItemProps {

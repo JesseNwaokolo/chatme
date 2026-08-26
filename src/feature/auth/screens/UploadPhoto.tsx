@@ -23,30 +23,34 @@ const UploadPhoto = ({ displayName }: UploadPhotoProps) => {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const router = useRouter();
-  const [photo, setPhoto] = useState<string | null>(null);
+  const user = useUserStore((s) => s.user);
+  const [photo, setPhoto] = useState<string | null>(user?.avatarUrl ?? null);
+  const [photoChanged, setPhotoChanged] = useState(false);
   const [sheetVisible, setSheetVisible] = useState(false);
   const { mutate: updateProfile, isPending } = useUpdateProfile();
   const setUser = useUserStore((s) => s.setUser);
 
   const onSubmit = async () => {
     if (!photo) return;
-    let avatarUrl: string;
-    try {
-      avatarUrl = await uploadAvatar(photo);
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "Couldn't upload photo",
-        text2: error instanceof Error ? error.message : undefined,
-      });
-      return;
+    let avatarUrl = photo;
+    if (photoChanged) {
+      try {
+        avatarUrl = await uploadAvatar(photo);
+      } catch (error) {
+        Toast.show({
+          type: "error",
+          text1: "Couldn't upload photo",
+          text2: error instanceof Error ? error.message : undefined,
+        });
+        return;
+      }
     }
     updateProfile(
       { displayName, avatarUrl },
       {
         onSuccess: (user) => {
           setUser(user);
-          router.replace("/(app)/chats");
+          router.replace("/(app)/(tabs)/chats");
         },
         onError: (error) => {
           Toast.show({
@@ -92,7 +96,10 @@ const UploadPhoto = ({ displayName }: UploadPhotoProps) => {
       <PhotoPickerSheet
         visible={sheetVisible}
         onClose={() => setSheetVisible(false)}
-        onSelect={setPhoto}
+        onSelect={(uri) => {
+          setPhoto(uri);
+          setPhotoChanged(true);
+        }}
       />
     </MySafeArea>
   );

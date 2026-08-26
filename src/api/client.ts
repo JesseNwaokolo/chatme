@@ -1,6 +1,6 @@
 import type { RefreshTokenResponse } from "@/src/feature/auth/api/types";
-import { logout } from "@/src/store/logout";
 import useAuthStore from "@/src/store/useAuthStore";
+import useUserStore from "@/src/store/useUserStore";
 import { create, InternalAxiosRequestConfig } from "axios";
 import { API_BASE_URL } from "./config";
 import { endpoints } from "./endpoints";
@@ -21,6 +21,15 @@ const refreshSession = (refreshToken: string) =>
   apiClient
     .post<RefreshTokenResponse>(endpoints.auth.refresh, { refreshToken })
     .then((res) => res.data);
+
+// Local-only session clear: the session is already unrecoverable at these call
+// sites, so there's no valid refresh token to notify the server with. Kept
+// separate from `src/store/logout.ts` to avoid a require cycle (that module
+// calls the auth API, which depends on this client).
+const clearSession = () => {
+  useAuthStore.getState().clearTokens();
+  useUserStore.getState().clearUser();
+};
 
 apiClient.interceptors.request.use((config) => {
   const accessToken = useAuthStore.getState().accessToken;
@@ -55,7 +64,7 @@ apiClient.interceptors.response.use(
 
     const refreshToken = useAuthStore.getState().refreshToken;
     if (!refreshToken) {
-      logout();
+      clearSession();
       return Promise.reject(normalizeError(error));
     }
 
@@ -85,7 +94,7 @@ apiClient.interceptors.response.use(
     } catch {
       isRefreshing = false;
       onRefreshed(null);
-      logout();
+      clearSession();
       return Promise.reject(normalizeError(error));
     }
   },
