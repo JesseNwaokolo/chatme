@@ -3,6 +3,7 @@ export { default as BackspaceIcon } from "./backspace";
 export { default as BellIcon } from "./bell";
 export { default as CallIcon } from "./call";
 export { default as CameraIcon } from "./camera";
+export { default as CameraPlusIcon } from "./camera-plus";
 export { default as ChatIcon } from "./chat";
 export { default as ChatMeIcon } from "./chatmeIcon";
 export { default as ChevronLeftIcon } from "./chevron-left";
