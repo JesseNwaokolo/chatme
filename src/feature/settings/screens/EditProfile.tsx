@@ -1,21 +1,29 @@
 import { useUpdateProfile } from "@/src/feature/auth/api/useUpdateProfile";
 import PhotoPickerSheet from "@/src/feature/auth/components/PhotoPickerSheet";
 import { uploadAvatar } from "@/src/feature/auth/utils/uploadAvatar";
+import { getLineHeight } from "@/src/helpers/lineHeight";
 import { Avatar } from "@/src/shared/components/Avatar";
 import { Button } from "@/src/shared/components/Button";
+import { StyledText } from "@/src/shared/components/StyledText";
 import { TextField } from "@/src/shared/components/TextField";
-import { CameraIcon, ChevronLeftIcon, PersonIcon, PhoneIcon } from "@/src/shared/icons";
+import {
+  CameraPlusIcon,
+  ChevronLeftIcon,
+  PersonIcon,
+  PhoneIcon,
+} from "@/src/shared/icons";
 import useUserStore from "@/src/store/useUserStore";
 import { useTheme } from "@/src/theme/useTheme";
 import { Theme } from "@/src/theme/useThemeStore";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
+import { getCountryByPhoneNumber } from "rn-international-phone-number";
 
-const AVATAR_SIZE = 140;
+const AVATAR_SIZE = 148;
 
 const EditProfile = () => {
   const { theme } = useTheme();
@@ -31,6 +39,12 @@ const EditProfile = () => {
   const [sheetVisible, setSheetVisible] = useState(false);
 
   const { mutate: updateProfile, isPending } = useUpdateProfile();
+
+  const country = useMemo(
+    () =>
+      user?.phoneNumber ? getCountryByPhoneNumber(user.phoneNumber) : undefined,
+    [user?.phoneNumber],
+  );
 
   const onSubmit = async () => {
     if (!name || !photo) return;
@@ -80,14 +94,18 @@ const EditProfile = () => {
 
         <View style={styles.avatarWrapper}>
           <View style={styles.avatarRing}>
-            <Avatar name={user?.displayName ?? ""} imageUrl={photo} size={AVATAR_SIZE} />
+            <Avatar
+              name={user?.displayName ?? ""}
+              imageUrl={photo}
+              size={AVATAR_SIZE}
+            />
           </View>
           <Pressable
             style={styles.cameraBadge}
             onPress={() => setSheetVisible(true)}
             hitSlop={12}
           >
-            <CameraIcon size={20} color={theme.buttonPrimaryText} />
+            <CameraPlusIcon size={20} color={theme.buttonPrimaryText} />
           </Pressable>
         </View>
 
@@ -103,13 +121,24 @@ const EditProfile = () => {
             label="Phone Number"
             value={user?.phoneNumber ?? ""}
             editable={false}
-            icon={(color) => <PhoneIcon color={color} />}
+            icon={(color) =>
+              country?.flag ? (
+                <StyledText
+                  size={20}
+                  style={{ lineHeight: getLineHeight(20, 1) }}
+                >
+                  {country.flag}
+                </StyledText>
+              ) : (
+                <PhoneIcon color={color} />
+              )
+            }
           />
         </View>
 
         <Button
           title="Save"
-          style={styles.saveButton}
+          style={[styles.saveButton, { marginBottom: insets.bottom + 8 }]}
           disabled={!name || !photo || isPending}
           loading={isPending}
           onPress={onSubmit}
@@ -130,7 +159,7 @@ const EditProfile = () => {
 
 export default EditProfile;
 
-const RING_WIDTH = 6;
+const RING_WIDTH = 4;
 const BADGE_SIZE = 40;
 
 const makeStyles = (theme: Theme) => {
@@ -140,14 +169,14 @@ const makeStyles = (theme: Theme) => {
       backgroundColor: theme.bgNeutral,
     },
     banner: {
-      height: 220,
+      height: 160,
       backgroundColor: theme.buttonPrimary,
       paddingHorizontal: 24,
     },
     avatarWrapper: {
       alignSelf: "center",
       marginTop: -(AVATAR_SIZE / 2) - RING_WIDTH,
-      marginBottom: 24,
+      marginBottom: 32,
     },
     avatarRing: {
       borderWidth: RING_WIDTH,
@@ -157,7 +186,7 @@ const makeStyles = (theme: Theme) => {
     },
     cameraBadge: {
       position: "absolute",
-      right: 4,
+      right: 0,
       bottom: 4,
       width: BADGE_SIZE,
       height: BADGE_SIZE,
@@ -165,8 +194,6 @@ const makeStyles = (theme: Theme) => {
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: theme.buttonPrimary,
-      borderWidth: 3,
-      borderColor: theme.bgNeutral,
     },
     form: {
       paddingHorizontal: 24,
@@ -175,7 +202,6 @@ const makeStyles = (theme: Theme) => {
     saveButton: {
       marginTop: "auto",
       marginHorizontal: 24,
-      marginBottom: 16,
     },
   });
 };

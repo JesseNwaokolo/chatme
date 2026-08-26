@@ -32,7 +32,7 @@ export const TextField = ({
 
   return (
     <View style={{ gap: 8 }}>
-      <StyledText weight="medium" size={14}>
+      <StyledText weight="medium" size={14} style={{ color: theme.textTertiary }}>
         {label}
       </StyledText>
       <View
