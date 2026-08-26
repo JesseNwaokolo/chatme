@@ -1,23 +1,23 @@
-import { getScaledFontSize } from "@/src/helpers/fontScale";
 import { getLineHeight } from "@/src/helpers/lineHeight";
 import { Button } from "@/src/shared/components/Button";
 import { MySafeArea } from "@/src/shared/components/MySafeArea";
 import { StyledText } from "@/src/shared/components/StyledText";
+import { TextField } from "@/src/shared/components/TextField";
 import { ChevronLeftIcon, PersonIcon } from "@/src/shared/icons";
-import { fonts } from "@/src/theme/fonts";
+import useUserStore from "@/src/store/useUserStore";
 import { useTheme } from "@/src/theme/useTheme";
 import { Theme } from "@/src/theme/useThemeStore";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 
 const EnterName = () => {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [isFocused, setIsFocused] = useState(false);
+  const user = useUserStore((s) => s.user);
+  const [name, setName] = useState(user?.displayName ?? "");
 
   const onSubmit = () => {
     router.push({
@@ -45,30 +45,13 @@ const EnterName = () => {
               Write your name. You can change it back in settings.
             </StyledText>
           </View>
-          <View style={{ gap: 8 }}>
-            <StyledText weight="medium" size={14}>
-              Name
-            </StyledText>
-            <View
-              style={[
-                styles.inputContainer,
-                isFocused && styles.inputContainerFocused,
-              ]}
-            >
-              <PersonIcon
-                color={isFocused ? theme.buttonPrimary : theme.textSecondary}
-              />
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                placeholder="Name"
-                placeholderTextColor={theme.textSecondary}
-                style={styles.input}
-              />
-            </View>
-          </View>
+          <TextField
+            label="Name"
+            value={name}
+            onChangeText={setName}
+            icon={(color) => <PersonIcon color={color} />}
+            placeholder="Name"
+          />
         </View>
         <Button
           title="Next"
@@ -107,28 +90,6 @@ const makeStyles = (theme: Theme) => {
     text: {
       color: theme.textSecondary,
       lineHeight: getLineHeight(14),
-    },
-    inputContainer: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      borderWidth: 1,
-      borderColor: theme.border,
-      borderRadius: 16,
-      paddingVertical: 18,
-      paddingHorizontal: 20,
-    },
-    inputContainerFocused: {
-      borderColor: theme.buttonPrimary,
-      backgroundColor: theme.bgPrimaryLight,
-    },
-    input: {
-      flex: 1,
-      padding: 0,
-      color: theme.textPrimary,
-      fontSize: getScaledFontSize(14),
-      lineHeight: getLineHeight(14),
-      fontFamily: fonts.medium,
     },
   });
 };

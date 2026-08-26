@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import Toast from "react-native-toast-message";
+import { useGetProfile } from "../api/useGetProfile";
 import { useResendOtp } from "../api/useResendOtp";
 import { useVerifyOtp } from "../api/useVerifyOtp";
 import OTP, { OTP_LENGTH } from "../components/OTP";
@@ -44,6 +45,7 @@ export default function VerifyOtp({
   const [currentChallengeId, setCurrentChallengeId] = useState(challengeId);
   const { mutate: resend, isPending: isResending } = useResendOtp();
   const { mutate: verify, isPending: isVerifying } = useVerifyOtp();
+  const { mutate: getProfile, isPending: isFetchingProfile } = useGetProfile();
   const setTokens = useAuthStore((s) => s.setTokens);
   const setUser = useUserStore((s) => s.setUser);
 
@@ -95,8 +97,22 @@ export default function VerifyOtp({
             refreshToken: data.refreshToken,
           });
           setUser(data.user);
+
           if (data.user.profileComplete) {
-            router.replace("/(app)/chats");
+            getProfile(undefined, {
+              onSuccess: (freshUser) => {
+                setUser(freshUser);
+                router.push({ pathname: "/(auth)/enter-name" });
+              },
+              onError: (error) => {
+                Toast.show({
+                  type: "error",
+                  text1: "Couldn't load profile",
+                  text2: error.message,
+                });
+                router.push({ pathname: "/(auth)/enter-name" });
+              },
+            });
           } else {
             router.push({ pathname: "/(auth)/enter-name" });
           }
@@ -159,8 +175,8 @@ export default function VerifyOtp({
         <Button
           title="Next"
           style={{ marginBottom: 6 }}
-          disabled={otpValue.length < OTP_LENGTH || isVerifying}
-          loading={isVerifying}
+          disabled={otpValue.length < OTP_LENGTH || isVerifying || isFetchingProfile}
+          loading={isVerifying || isFetchingProfile}
           onPress={onSubmit}
         />
       </KeyboardAvoidingView>

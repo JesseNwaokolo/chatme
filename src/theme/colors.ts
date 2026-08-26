@@ -13,7 +13,8 @@ const colors = {
   warning : "#E8A13A",
   danger : "#DD524C",
   neutralAction : "#B3C2CE",
-  neutralActionLight : "#DDE2E8"
+  neutralActionLight : "#DDE2E8",
+  neutral600 : "#1F3C51"
 };
 
 export const lightTheme = {
@@ -24,6 +25,7 @@ export const lightTheme = {
   buttonPrimaryText: colors.light,
   textPrimary: colors.neutral900,
   textSecondary: colors.neutral300,
+  textTertiary: colors.neutral600,
   border : colors.divider,
   border2 : colors.border,
   shadow : colors.shadow,
@@ -42,6 +44,7 @@ export const darkTheme: typeof lightTheme = {
   buttonPrimaryText: colors.light,
   textPrimary: colors.light,
   textSecondary: colors.neutral300,
+  textTertiary: colors.neutral600,
   border : colors.divider,
   border2 : colors.border,
   shadow : colors.shadow,

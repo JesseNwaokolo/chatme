@@ -2,7 +2,7 @@ import { StyledText } from "@/src/shared/components/StyledText";
 import { useTheme } from "@/src/theme/useTheme";
 import { StyleSheet, View } from "react-native";
 import { SuggestedContact } from "../types";
-import { Avatar } from "./Avatar";
+import { Avatar } from "@/src/shared/components/Avatar";
 
 interface AvatarStackProps {
   contacts: SuggestedContact[];

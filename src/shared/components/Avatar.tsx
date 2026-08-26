@@ -1,6 +1,6 @@
 import { PersonIcon } from "@/src/shared/icons";
 import { useTheme } from "@/src/theme/useTheme";
-import { StyleSheet, View, ViewStyle } from "react-native";
+import { Image, StyleSheet, View, ViewStyle } from "react-native";
 import { StyledText } from "@/src/shared/components/StyledText";
 
 const PALETTE = ["#F59E0B", "#EF4444", "#8B5CF6", "#3B82F6", "#10B981", "#EC4899"];
@@ -27,6 +27,7 @@ interface AvatarProps {
   size?: number;
   isGroup?: boolean;
   online?: boolean;
+  imageUrl?: string | null;
   style?: ViewStyle;
 }
 
@@ -35,6 +36,7 @@ export const Avatar = ({
   size = 48,
   isGroup = false,
   online = false,
+  imageUrl,
   style,
 }: AvatarProps) => {
   const { theme } = useTheme();
@@ -52,7 +54,12 @@ export const Avatar = ({
           },
         ]}
       >
-        {isGroup ? (
+        {imageUrl ? (
+          <Image
+            source={{ uri: imageUrl }}
+            style={{ width: size, height: size }}
+          />
+        ) : isGroup ? (
           <PersonIcon size={size * 0.5} color="#FFFFFF" />
         ) : (
           <StyledText

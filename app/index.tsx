@@ -9,10 +9,10 @@ export default function Index() {
   const status = getAuthStatus(accessToken, user);
 
   if (status === "complete") {
-    return <Redirect href="/(app)/chats" />;
+    return <Redirect href="/(app)/(tabs)/chats" />;
   }
   if (status === "incomplete") {
-    return <Redirect href="/(auth)/enter-name" />;
+    return <Redirect href="/(auth)" />;
   }
   return <Redirect href="/(onboarding)" />;
 }

@@ -1,0 +1,25 @@
+import Svg, { Path } from "react-native-svg";
+
+interface QuestionCircleIconProps {
+  size?: number;
+  color?: string;
+}
+
+const QuestionCircleIcon = ({
+  size = 16,
+  color = "#57B77D",
+}: QuestionCircleIconProps) => {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <Path
+        d="M5.48511 6C5.85118 5.22321 6.83895 4.66667 8.00004 4.66667C9.4728 4.66667 10.6667 5.5621 10.6667 6.66667C10.6667 7.59963 9.81496 8.38338 8.66285 8.6044C8.30125 8.67377 8.00004 8.96514 8.00004 9.33333M8 11.3333H8.00667M14 8C14 11.3137 11.3137 14 8 14C4.68629 14 2 11.3137 2 8C2 4.68629 4.68629 2 8 2C11.3137 2 14 4.68629 14 8Z"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+};
+
+export default QuestionCircleIcon;

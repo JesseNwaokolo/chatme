@@ -9,7 +9,7 @@ const AuthLayout = () => {
   const status = getAuthStatus(accessToken, user);
 
   if (status === "complete") {
-    return <Redirect href="/(app)/chats" />;
+    return <Redirect href="/(app)/(tabs)/chats" />;
   }
 
   return <Stack screenOptions={{ headerShown: false }} />;

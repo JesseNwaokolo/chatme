@@ -58,6 +58,10 @@ export interface RefreshTokenRequest {
 
 export type RefreshTokenResponse = AuthSession;
 
+export interface LogoutRequest {
+  refreshToken: string;
+}
+
 export interface UpdateProfileRequest {
   displayName: string;
   avatarUrl: string;
