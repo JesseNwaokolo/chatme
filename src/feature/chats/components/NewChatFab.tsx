@@ -1,10 +1,12 @@
 import { PlusIcon } from "@/src/shared/icons";
+import useThemeStore from "@/src/theme/useThemeStore";
 import { Pressable, StyleSheet } from "react-native";
 
 export const NewChatFab = () => {
+  const {accentColor} = useThemeStore();
   return (
     <Pressable style={styles.fab}>
-      <PlusIcon />
+      <PlusIcon color={accentColor} />
     </Pressable>
   );
 };

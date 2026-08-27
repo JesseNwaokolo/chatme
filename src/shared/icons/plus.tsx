@@ -2,12 +2,13 @@ import Svg, { Path, Rect } from "react-native-svg";
 
 interface PlusIconProps {
   size?: number;
+  color?: string;
 }
 
-const PlusIcon = ({ size = 64 }: PlusIconProps) => {
+const PlusIcon = ({ size = 64, color }: PlusIconProps) => {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64" fill="none">
-      <Rect width={64} height={64} rx={32} fill="#57B77D" />
+      <Rect width={64} height={64} rx={32} fill={color ?? "#57B77D"} />
       <Path
         fillRule="evenodd"
         clipRule="evenodd"
