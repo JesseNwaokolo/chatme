@@ -107,7 +107,7 @@ const SettingsScreen = () => {
             icon={<ContrastIcon color={theme.buttonPrimary} />}
             label="Appearance"
             type="nav"
-            onPress={() => {}}
+            onPress={() => router.push("/appearance")}
           />
           <SettingsRow
             icon={<BellIcon color={theme.buttonPrimary} />}

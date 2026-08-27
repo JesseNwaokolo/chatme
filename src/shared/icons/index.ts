@@ -1,4 +1,5 @@
 export { default as ArchiveIcon } from "./archive";
+export { default as AppLogoIcon } from "./app-logo";
 export { default as BackspaceIcon } from "./backspace";
 export { default as BellIcon } from "./bell";
 export { default as CallIcon } from "./call";
@@ -11,10 +12,12 @@ export { default as ContrastIcon } from "./contrast";
 export { default as DatabaseIcon } from "./database";
 export { default as DeleteIcon } from "./delete";
 export { default as EditIcon } from "./edit";
+export { default as EmojiIcon } from "./emoji";
 export { default as GalleryIcon } from "./gallery";
 export { default as LockIcon } from "./lock";
 export { default as LockOutlineIcon } from "./lock-outline";
 export { default as LogoutIcon } from "./logout";
+export { default as MoonIcon } from "./moon";
 export { default as MoreIcon } from "./more";
 export { default as MuteIcon } from "./mute";
 export { default as PeopleIcon } from "./people";
