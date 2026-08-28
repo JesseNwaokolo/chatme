@@ -102,7 +102,12 @@ export const ChatListItem = ({
       overshootRight={false}
     >
       <View style={styles.row}>
-        <Avatar name={chat.name} isGroup={chat.isGroup} online={chat.online} />
+        <Avatar
+          name={chat.name}
+          imageUrl={chat.avatarUrl}
+          isGroup={chat.isGroup}
+          online={chat.online}
+        />
         <View style={styles.body}>
           <View style={styles.nameRow}>
             <StyledText weight="bold" numberOfLines={1} style={styles.name}>

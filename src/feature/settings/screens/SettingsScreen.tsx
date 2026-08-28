@@ -15,6 +15,7 @@ import {
   QuestionCircleIcon,
   StarIcon,
 } from "@/src/shared/icons";
+import { logout } from "@/src/store/logout";
 import useUserStore from "@/src/store/useUserStore";
 import { useTheme } from "@/src/theme/useTheme";
 import { Theme } from "@/src/theme/useThemeStore";

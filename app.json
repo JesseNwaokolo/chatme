@@ -63,6 +63,12 @@
           "photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can pick a recent photo for your profile."
         }
       ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow $(PRODUCT_NAME) to access your contacts to find friends already on ChatMe."
+        }
+      ],
       "expo-secure-store"
     ],
     "experiments": {

@@ -1,18 +1,24 @@
 import { apiClient } from "@/src/api/client";
+import { endpoints } from "@/src/api/endpoints";
+import useUserStore from "@/src/store/useUserStore";
 import { Chat } from "../types";
-import { ChatResponse, SendMessageRequest } from "./types";
+import { ConversationListResponse, ConversationResponse } from "./types";
 
-const toChat = (response: ChatResponse): Chat => ({
-  ...response,
-  timestamp: new Date(response.timestamp),
-});
+const toChat = (conversation: ConversationResponse): Chat => {
+  const myUserId = useUserStore.getState().user?.id;
 
-export const getChats = () =>
+  return {
+    id: conversation.id,
+    name: conversation.otherParticipant.displayName ?? "Unknown",
+    avatarUrl: conversation.otherParticipant.avatarUrl,
+    lastMessage: conversation.latestMessage?.preview ?? "No messages yet",
+    fromMe: conversation.latestMessage?.senderId === myUserId,
+    timestamp: new Date(conversation.latestMessage?.createdAt ?? conversation.lastActivityAt),
+    unreadCount: conversation.unreadCount,
+  };
+};
+
+export const getConversations = () =>
   apiClient
-    .get<ChatResponse[]>("/chats")
-    .then((res) => res.data.map(toChat));
-
-export const sendMessage = (payload: SendMessageRequest) =>
-  apiClient
-    .post<ChatResponse>(`/chats/${payload.chatId}/messages`, payload)
-    .then((res) => toChat(res.data));
+    .get<ConversationListResponse>(endpoints.conversations.list)
+    .then((res) => res.data.items.map(toChat));
