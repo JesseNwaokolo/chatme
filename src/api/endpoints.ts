@@ -10,4 +10,14 @@ export const endpoints = {
     getProfile: "/v1/me",
     updateProfile: "/v1/me",
   },
+  contacts: {
+    match: "/v1/contacts/match",
+  },
+  conversations: {
+    createDirect: "/v1/conversations/direct",
+    list: "/v1/conversations",
+  },
+  discovery: {
+    searchUsers: "/v1/users/search",
+  },
 } as const;

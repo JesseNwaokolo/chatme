@@ -6,18 +6,15 @@ import { Theme } from "@/src/theme/useThemeStore";
 import { useFocusEffect, useRouter } from "expo-router";
 import { setStatusBarStyle } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AddPinModal from "../components/AddPinModal";
 import { ChatListItem } from "../components/ChatListItem";
 import { EmptyChatsState } from "../components/EmptyChatsState";
 import { NewChatFab } from "../components/NewChatFab";
 import { getLineHeight } from "@/src/helpers/lineHeight";
-import {
-  mockChats,
-  suggestedContacts,
-  suggestedContactsOverflowCount,
-} from "../data/mockChats";
+import { useChats } from "../api/useChats";
+import { suggestedContacts, suggestedContactsOverflowCount } from "../data/mockChats";
 import { Chat } from "../types";
 
 const ChatsScreen = () => {
@@ -25,8 +22,13 @@ const ChatsScreen = () => {
   const insets = useSafeAreaInsets();
   const styles = makeStyles(theme);
   const router = useRouter();
-  
-  const [chats, setChats] = useState<Chat[]>(mockChats);
+
+  const { data: conversations, isLoading, isError, refetch } = useChats();
+  const [chats, setChats] = useState<Chat[]>([]);
+
+  useEffect(() => {
+    if (conversations) setChats(conversations);
+  }, [conversations]);
 
   const visibleChats = useMemo(
     () =>
@@ -90,15 +92,18 @@ const ChatsScreen = () => {
           { paddingTop: insets.top + 16 },
         ]}
       >
-        <StyledText
-          weight="bold"
-          size={24}
-          style={{
-            color: hasChats ? theme.buttonPrimaryText : theme.textPrimary,
-          }}
-        >
-          Chats
-        </StyledText>
+        {/* TEMP: long-press to reach the Socket Debug screen */}
+        <Pressable onLongPress={() => router.push("/socket-debug")}>
+          <StyledText
+            weight="bold"
+            size={24}
+            style={{
+              color: hasChats ? theme.buttonPrimaryText : theme.textPrimary,
+            }}
+          >
+            Chats
+          </StyledText>
+        </Pressable>
         {hasChats && (
           <View style={styles.searchBar}>
             <SearchIcon color="rgba(255,255,255,0.8)" />
@@ -111,7 +116,22 @@ const ChatsScreen = () => {
         )}
       </View>
 
-      {hasChats ? (
+      {isLoading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator color={theme.buttonPrimary} />
+        </View>
+      ) : isError ? (
+        <View style={styles.centered}>
+          <StyledText style={{ color: theme.textSecondary, textAlign: "center" }}>
+            Couldn&apos;t load your chats.
+          </StyledText>
+          <Pressable onPress={() => refetch()}>
+            <StyledText weight="bold" style={{ color: theme.buttonPrimary }}>
+              Try again
+            </StyledText>
+          </Pressable>
+        </View>
+      ) : hasChats ? (
         <FlatList
           data={visibleChats}
           keyExtractor={(item: Chat) => item.id}
@@ -183,6 +203,12 @@ const makeStyles = (theme: Theme) => {
       paddingTop: 12,
       paddingBottom: 100,
       gap : 4
+    },
+    centered: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
     },
   });
 };
