@@ -1,10 +1,15 @@
+import { getLineHeight } from "@/src/helpers/lineHeight";
 import { StyledText } from "@/src/shared/components/StyledText";
-import { ChatIcon, PeopleIcon, PersonIcon } from "@/src/shared/icons";
+import { ChatIcon, NewContactIcon, NewGroupIcon } from "@/src/shared/icons";
 import { useTheme } from "@/src/theme/useTheme";
 import { Theme } from "@/src/theme/useThemeStore";
-import { Pressable, StyleSheet, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useEffect } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 
 interface NewChatMenuProps {
   visible: boolean;
@@ -14,11 +19,15 @@ interface NewChatMenuProps {
 
 const PILLS = [
   { key: "newChat", icon: ChatIcon, label: "New Chat" },
-  { key: "newContact", icon: PersonIcon, label: "New Contact" },
-  { key: "newGroup", icon: PeopleIcon, label: "New Group" },
+  { key: "newContact", icon: NewContactIcon, label: "New Contact" },
+  { key: "newGroup", icon: NewGroupIcon, label: "New Group" },
 ] as const;
 
-export const NewChatMenu = ({ visible, onDismiss, onSelectNewChat }: NewChatMenuProps) => {
+export const NewChatMenu = ({
+  visible,
+  onDismiss,
+  onSelectNewChat,
+}: NewChatMenuProps) => {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
 
@@ -50,11 +59,20 @@ export const NewChatMenu = ({ visible, onDismiss, onSelectNewChat }: NewChatMenu
 
       <View style={styles.pillColumn} pointerEvents="box-none">
         {PILLS.map(({ key, icon: Icon, label }) => (
-          <Pressable key={key} style={styles.pill} onPress={() => handlePress(key)}>
-            <View style={styles.iconBadge}>
-              <Icon size={18} color={theme.buttonPrimaryText} />
-            </View>
-            <StyledText weight="bold" size={16} style={{ color: theme.textPrimary }}>
+          <Pressable
+            key={key}
+            style={styles.pill}
+            onPress={() => handlePress(key)}
+          >
+            <Icon size={24} color={theme.buttonPrimary} />
+            <StyledText
+              weight="bold"
+              size={16}
+              style={{
+                color: theme.textTertiary,
+                lineHeight: getLineHeight(18, 1.25),
+              }}
+            >
               {label}
             </StyledText>
           </Pressable>
@@ -80,23 +98,15 @@ const makeStyles = (theme: Theme) =>
     pill: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 10,
+      width: 180,
+      gap: 16,
       backgroundColor: theme.bgNeutral,
-      borderRadius: 999,
-      paddingVertical: 10,
-      paddingHorizontal: 16,
+      borderRadius: 100,
+      padding: 16,
       shadowColor: theme.shadow2,
       shadowOpacity: 0.12,
       shadowRadius: 12,
       shadowOffset: { width: 0, height: 4 },
       elevation: 4,
-    },
-    iconBadge: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: theme.buttonPrimary,
     },
   });

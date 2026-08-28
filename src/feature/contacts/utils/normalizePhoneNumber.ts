@@ -1,7 +1,6 @@
 import useUserStore from "@/src/store/useUserStore";
 import { getCountryByPhoneNumber } from "rn-international-phone-number";
 
-// Best-effort cleanup only — the server normalizes/matches numbers itself too.
 export function normalizePhoneNumber(raw: string): string {
   const cleaned = raw.replace(/[^\d+]/g, "");
   if (cleaned.startsWith("+")) {

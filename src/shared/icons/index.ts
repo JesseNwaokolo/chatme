@@ -20,6 +20,8 @@ export { default as LogoutIcon } from "./logout";
 export { default as MoonIcon } from "./moon";
 export { default as MoreIcon } from "./more";
 export { default as MuteIcon } from "./mute";
+export { default as NewContactIcon } from "./new-contact";
+export { default as NewGroupIcon } from "./new-group";
 export { default as PeopleIcon } from "./people";
 export { default as PersonIcon } from "./person";
 export { default as PhoneIcon } from "./phone";
