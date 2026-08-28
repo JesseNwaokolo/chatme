@@ -42,15 +42,20 @@ const ContactScreen = () => {
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query.trim(), 300);
   const isSearching = debouncedQuery.length > 0;
-  const queryTooShort = isSearching && debouncedQuery.length < MIN_SEARCH_QUERY_LENGTH;
+  const queryTooShort =
+    isSearching && debouncedQuery.length < MIN_SEARCH_QUERY_LENGTH;
 
   const { status: contactsStatus, contacts } = useDeviceContacts();
   const phoneNumbers = useMemo(
     () => contacts.flatMap((c) => c.phoneNumbers.map(normalizePhoneNumber)),
     [contacts],
   );
-  const { data: matchData, isLoading: isMatching } = useMatchContacts(phoneNumbers);
-  const { data: searchData, isLoading: isSearchLoading } = useSearchUsers(debouncedQuery);
+  const { data: matchData, error, isError, isLoading: isMatching } =
+    useMatchContacts(phoneNumbers);
+
+  const { data: searchData, isLoading: isSearchLoading } =
+    useSearchUsers(debouncedQuery);
+
   const createConversation = useCreateDirectConversation();
 
   const { sections, matchesByUserId } = useMemo(
@@ -83,17 +88,25 @@ const ContactScreen = () => {
 
   const dismiss = () => {
     overlayOpacity.value = withTiming(0, { duration: 220 });
-    translateY.value = withTiming(SCREEN_HEIGHT, { duration: 220 }, (finished) => {
-      if (finished) runOnJS(router.back)();
-    });
+    translateY.value = withTiming(
+      SCREEN_HEIGHT,
+      { duration: 220 },
+      (finished) => {
+        if (finished) runOnJS(router.back)();
+      },
+    );
   };
 
   const handleStartChat = (participantId: string) => {
     createConversation.mutate(participantId, { onSuccess: () => dismiss() });
   };
 
-  const overlayAnimStyle = useAnimatedStyle(() => ({ opacity: overlayOpacity.value }));
-  const sheetAnimStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
+  const overlayAnimStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+  }));
+  const sheetAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
 
   const renderContactRow = ({ item }: { item: ContactRow }) => {
     const isMatched = !!item.matchedUser;
@@ -101,14 +114,18 @@ const ContactScreen = () => {
       <Pressable
         style={styles.row}
         disabled={!isMatched}
-        onPress={() => isMatched && item.matchedUser && handleStartChat(item.matchedUser.id)}
+        onPress={() =>
+          isMatched && item.matchedUser && handleStartChat(item.matchedUser.id)
+        }
       >
         <Avatar name={item.name} imageUrl={item.imageUri} size={44} />
         <View style={styles.body}>
           <StyledText
             weight="bold"
             numberOfLines={1}
-            style={{ color: isMatched ? theme.buttonPrimary : theme.textPrimary }}
+            style={{
+              color: isMatched ? theme.buttonPrimary : theme.textPrimary,
+            }}
           >
             {item.name}
           </StyledText>
@@ -123,7 +140,11 @@ const ContactScreen = () => {
             <ChevronLeftIcon size={18} color={theme.textSecondary} />
           </View>
         ) : (
-          <StyledText size={14} weight="medium" style={{ color: theme.textTertiary }}>
+          <StyledText
+            size={14}
+            weight="medium"
+            style={{ color: theme.textTertiary }}
+          >
             Invite
           </StyledText>
         )}
@@ -133,15 +154,27 @@ const ContactScreen = () => {
 
   const renderSearchRow = ({ item }: { item: SearchResultRow }) => (
     <Pressable style={styles.row} onPress={() => handleStartChat(item.id)}>
-      <Avatar name={item.displayName ?? "?"} imageUrl={item.avatarUrl} size={44} />
+      <Avatar
+        name={item.displayName ?? "?"}
+        imageUrl={item.avatarUrl}
+        size={44}
+      />
       <View style={styles.body}>
         <View style={styles.nameRow}>
-          <StyledText weight="bold" numberOfLines={1} style={{ color: theme.textPrimary }}>
+          <StyledText
+            weight="bold"
+            numberOfLines={1}
+            style={{ color: theme.textPrimary }}
+          >
             {item.displayName ?? "Unknown"}
           </StyledText>
           {item.inContacts && (
             <View style={styles.tag}>
-              <StyledText size={11} weight="bold" style={{ color: theme.buttonPrimaryText }}>
+              <StyledText
+                size={11}
+                weight="bold"
+                style={{ color: theme.buttonPrimaryText }}
+              >
                 In your contacts
               </StyledText>
             </View>
@@ -160,7 +193,8 @@ const ContactScreen = () => {
   );
 
   const showLoading =
-    contactsStatus === "loading" || (contactsStatus === "granted" && isMatching && sections.length === 0);
+    contactsStatus === "loading" ||
+    (contactsStatus === "granted" && isMatching && sections.length === 0);
 
   return (
     <View style={StyleSheet.absoluteFillObject}>
@@ -168,7 +202,13 @@ const ContactScreen = () => {
         <Animated.View style={[styles.overlay, overlayAnimStyle]} />
       </Pressable>
 
-      <Animated.View style={[styles.sheet, { paddingTop: insets.top > 0 ? 12 : 24 }, sheetAnimStyle]}>
+      <Animated.View
+        style={[
+          styles.sheet,
+          { paddingTop: insets.top > 0 ? 12 : 24 },
+          sheetAnimStyle,
+        ]}
+      >
         <View style={styles.dragHandle} />
         <StyledText weight="bold" size={20} style={styles.title}>
           Contact
@@ -178,7 +218,7 @@ const ContactScreen = () => {
           <SearchIcon size={18} color={theme.textTertiary} />
           <TextInput
             placeholder="Search people..."
-            placeholderTextColor={theme.textTertiary}
+            placeholderTextColor={theme.textSecondary}
             value={query}
             onChangeText={setQuery}
             style={[styles.searchInput, { color: theme.textPrimary }]}
@@ -187,8 +227,11 @@ const ContactScreen = () => {
 
         {contactsStatus === "denied" ? (
           <View style={styles.centered}>
-            <StyledText style={{ color: theme.textSecondary, textAlign: "center" }}>
-              Contacts access was denied. Enable it in Settings to find friends on ChatMe.
+            <StyledText
+              style={{ color: theme.textSecondary, textAlign: "center" }}
+            >
+              Contacts access was denied. Enable it in Settings to find friends
+              on ChatMe.
             </StyledText>
           </View>
         ) : showLoading ? (
@@ -198,7 +241,9 @@ const ContactScreen = () => {
         ) : isSearching ? (
           queryTooShort ? (
             <View style={styles.centered}>
-              <StyledText style={{ color: theme.textSecondary, textAlign: "center" }}>
+              <StyledText
+                style={{ color: theme.textSecondary, textAlign: "center" }}
+              >
                 Type at least {MIN_SEARCH_QUERY_LENGTH} characters to search
               </StyledText>
             </View>
@@ -222,7 +267,11 @@ const ContactScreen = () => {
             renderItem={renderContactRow}
             renderSectionHeader={({ section }) => (
               <View style={styles.sectionHeader}>
-                <StyledText size={13} weight="bold" style={{ color: theme.textTertiary }}>
+                <StyledText
+                  size={13}
+                  weight="bold"
+                  style={{ color: theme.textTertiary }}
+                >
                   {section.title}
                 </StyledText>
               </View>
@@ -254,7 +303,7 @@ const makeStyles = (theme: Theme) =>
       backgroundColor: theme.bgNeutral,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
-      paddingHorizontal: 16,
+      paddingHorizontal: 24,
     },
     dragHandle: {
       alignSelf: "center",
