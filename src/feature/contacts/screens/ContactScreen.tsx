@@ -50,7 +50,7 @@ const ContactScreen = () => {
     () => contacts.flatMap((c) => c.phoneNumbers.map(normalizePhoneNumber)),
     [contacts],
   );
-  const { data: matchData, error, isError, isLoading: isMatching } =
+  const { data: matchData, isLoading: isMatching } =
     useMatchContacts(phoneNumbers);
 
   const { data: searchData, isLoading: isSearchLoading } =

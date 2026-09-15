@@ -9,10 +9,11 @@ import {
 } from "@/src/shared/icons";
 import { useTheme } from "@/src/theme/useTheme";
 import { Theme } from "@/src/theme/useThemeStore";
-import { useRef } from "react";
-import { StyleSheet, View } from "react-native";
+import { useRef, useState } from "react";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
 import Swipeable, {
   SwipeableMethods,
+  SwipeDirection,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
 import { Chat } from "../types";
 import { Avatar } from "@/src/shared/components/Avatar";
@@ -20,6 +21,7 @@ import { SwipeActionButton } from "./SwipeActionButton";
 
 interface ChatListItemProps {
   chat: Chat;
+  onPress?: () => void;
   onToggleMute?: () => void;
   onTogglePinned?: () => void;
   onDelete?: () => void;
@@ -29,6 +31,7 @@ interface ChatListItemProps {
 
 export const ChatListItem = ({
   chat,
+  onPress,
   onToggleMute,
   onTogglePinned,
   onDelete,
@@ -39,15 +42,22 @@ export const ChatListItem = ({
   const styles = makeStyles(theme);
   const { label, isToday } = formatChatTime(chat.timestamp);
   const swipeableRef = useRef<SwipeableMethods>(null);
+  const [openDirection, setOpenDirection] = useState<SwipeDirection | null>(null);
 
   const renderLeftActions = () => (
-    <View style={styles.actionsRow}>
+    <View
+      style={styles.actionsRow}
+      // Swipeable reports the direction the row itself moved, not which
+      // panel is showing — revealing the left actions moves the row right.
+      pointerEvents={openDirection === SwipeDirection.RIGHT ? "auto" : "none"}
+    >
       <SwipeActionButton
         label="Mute"
         icon={<MuteIcon color={theme.buttonPrimaryText} />}
         backgroundColor={theme.warning}
         onPress={() => {
           swipeableRef.current?.close();
+          Alert.alert("Mute");
           onToggleMute?.();
         }}
       />
@@ -57,6 +67,7 @@ export const ChatListItem = ({
         backgroundColor={theme.neutralAction}
         onPress={() => {
           swipeableRef.current?.close();
+          Alert.alert("Pinned");
           onTogglePinned?.();
         }}
       />
@@ -64,12 +75,20 @@ export const ChatListItem = ({
   );
 
   const renderRightActions = () => (
-    <View style={styles.actionsRow}>
+    <View
+      style={styles.actionsRow}
+      // Same inversion as above — revealing the right actions moves the
+      // row left.
+      pointerEvents={openDirection === SwipeDirection.LEFT ? "auto" : "none"}
+    >
       <SwipeActionButton
         label="Delete"
         icon={<DeleteIcon color={theme.buttonPrimaryText} />}
         backgroundColor={theme.danger}
-        onPress={() => onDelete?.()}
+        onPress={() => {
+          Alert.alert("Delete");
+          onDelete?.();
+        }}
       />
       <SwipeActionButton
         label="Archived"
@@ -77,6 +96,7 @@ export const ChatListItem = ({
         backgroundColor={theme.neutralAction}
         onPress={() => {
           swipeableRef.current?.close();
+          Alert.alert("Archived");
           onToggleArchived?.();
         }}
       />
@@ -100,8 +120,10 @@ export const ChatListItem = ({
       friction={2}
       overshootLeft={false}
       overshootRight={false}
+      onSwipeableWillOpen={setOpenDirection}
+      onSwipeableWillClose={() => setOpenDirection(null)}
     >
-      <View style={styles.row}>
+      <Pressable style={styles.row} onPress={onPress}>
         <Avatar
           name={chat.name}
           imageUrl={chat.avatarUrl}
@@ -113,6 +135,7 @@ export const ChatListItem = ({
             <StyledText weight="bold" numberOfLines={1} style={styles.name}>
               {chat.name}
             </StyledText>
+            {chat.pinned && <PinIcon color={theme.textSecondary} />}
             {chat.muted && <MuteIcon color={theme.textSecondary} />}
           </View>
           <StyledText
@@ -141,7 +164,7 @@ export const ChatListItem = ({
             </View>
           )}
         </View>
-      </View>
+      </Pressable>
     </Swipeable>
   );
 };

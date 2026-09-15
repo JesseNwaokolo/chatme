@@ -16,6 +16,11 @@ export const endpoints = {
   conversations: {
     createDirect: "/v1/conversations/direct",
     list: "/v1/conversations",
+    detail: (conversationId: string) => `/v1/conversations/${conversationId}`,
+    messages: (conversationId: string) => `/v1/conversations/${conversationId}/messages`,
+    receiptsDelivered: (conversationId: string) =>
+      `/v1/conversations/${conversationId}/receipts/delivered`,
+    receiptsRead: (conversationId: string) => `/v1/conversations/${conversationId}/receipts/read`,
   },
   discovery: {
     searchUsers: "/v1/users/search",

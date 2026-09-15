@@ -27,7 +27,9 @@
         "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.READ_MEDIA_AUDIO"
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS"
       ],
       "package": "com.jessecn.risechat"
     },
@@ -74,6 +76,19 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f820de2c-7805-45f1-b605-1f85a0769647"
+      }
+    },
+    "owner": "jessecn",
+    "updates": {
+      "url": "https://u.expo.dev/f820de2c-7805-45f1-b605-1f85a0769647"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }

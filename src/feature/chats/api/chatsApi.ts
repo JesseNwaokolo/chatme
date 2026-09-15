@@ -9,6 +9,7 @@ const toChat = (conversation: ConversationResponse): Chat => {
 
   return {
     id: conversation.id,
+    participantId: conversation.otherParticipant.id,
     name: conversation.otherParticipant.displayName ?? "Unknown",
     avatarUrl: conversation.otherParticipant.avatarUrl,
     lastMessage: conversation.latestMessage?.preview ?? "No messages yet",
@@ -22,3 +23,8 @@ export const getConversations = () =>
   apiClient
     .get<ConversationListResponse>(endpoints.conversations.list)
     .then((res) => res.data.items.map(toChat));
+
+export const getConversation = (conversationId: string) =>
+  apiClient
+    .get<ConversationResponse>(endpoints.conversations.detail(conversationId))
+    .then((res) => res.data);

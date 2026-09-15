@@ -78,7 +78,7 @@ const SettingsScreen = () => {
               {user?.phoneNumber}
             </StyledText>
           </View>
-          <Pressable onPress={() => {}}>
+          <Pressable onPress={() => router.push("/qr-code")}>
             <QrCodeIcon size={32} color={theme.buttonPrimary} />
           </Pressable>
         </View>
@@ -145,7 +145,7 @@ const SettingsScreen = () => {
             label="Logout"
             type="nav"
             destructive
-            // onPress={logout}
+            onPress={logout}
           />
         </View>
 

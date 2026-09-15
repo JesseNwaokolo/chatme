@@ -17,11 +17,6 @@ export const apiClient = create({
   },
 });
 
-const refreshSession = (refreshToken: string) =>
-  apiClient
-    .post<RefreshTokenResponse>(endpoints.auth.refresh, { refreshToken })
-    .then((res) => res.data);
-
 // Local-only session clear: the session is already unrecoverable at these call
 // sites, so there's no valid refresh token to notify the server with. Kept
 // separate from `src/store/logout.ts` to avoid a require cycle (that module
@@ -31,6 +26,43 @@ const clearSession = () => {
   useUserStore.getState().clearUser();
 };
 
+// Shared by the response interceptor below and `socketClient.ts` (which needs
+// to refresh independently when the socket's access token expires). Both call
+// sites await the same in-flight promise instead of racing two refresh calls
+// against the same (single-use/rotating) refresh token — losing that race
+// used to wipe out a session that had just been refreshed successfully by the
+// other caller a moment earlier.
+let refreshPromise: Promise<string> | null = null;
+
+export function refreshAccessToken(): Promise<string> {
+  if (refreshPromise) return refreshPromise;
+
+  const refreshToken = useAuthStore.getState().refreshToken;
+  if (!refreshToken) {
+    clearSession();
+    return Promise.reject(new Error("No refresh token"));
+  }
+
+  refreshPromise = apiClient
+    .post<RefreshTokenResponse>(endpoints.auth.refresh, { refreshToken })
+    .then((res) => {
+      useAuthStore.getState().setTokens({
+        accessToken: res.data.accessToken,
+        refreshToken: res.data.refreshToken,
+      });
+      return res.data.accessToken;
+    })
+    .catch((err) => {
+      clearSession();
+      throw err;
+    })
+    .finally(() => {
+      refreshPromise = null;
+    });
+
+  return refreshPromise;
+}
+
 apiClient.interceptors.request.use((config) => {
   const accessToken = useAuthStore.getState().accessToken;
   if (accessToken) {
@@ -38,14 +70,6 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
-
-let isRefreshing = false;
-let pendingQueue: ((token: string | null) => void)[] = [];
-
-const onRefreshed = (token: string | null) => {
-  pendingQueue.forEach((cb) => cb(token));
-  pendingQueue = [];
-};
 
 apiClient.interceptors.response.use(
   (response) => response,
@@ -62,39 +86,13 @@ apiClient.interceptors.response.use(
       return Promise.reject(normalizeError(error));
     }
 
-    const refreshToken = useAuthStore.getState().refreshToken;
-    if (!refreshToken) {
-      clearSession();
-      return Promise.reject(normalizeError(error));
-    }
-
     originalRequest._retry = true;
 
-    if (isRefreshing) {
-      return new Promise((resolve, reject) => {
-        pendingQueue.push((token) => {
-          if (!token) return reject(normalizeError(error));
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          resolve(apiClient(originalRequest));
-        });
-      });
-    }
-
-    isRefreshing = true;
     try {
-      const data = await refreshSession(refreshToken);
-      useAuthStore.getState().setTokens({
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-      });
-      isRefreshing = false;
-      onRefreshed(data.accessToken);
-      originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+      const accessToken = await refreshAccessToken();
+      originalRequest.headers.Authorization = `Bearer ${accessToken}`;
       return apiClient(originalRequest);
     } catch {
-      isRefreshing = false;
-      onRefreshed(null);
-      clearSession();
       return Promise.reject(normalizeError(error));
     }
   },

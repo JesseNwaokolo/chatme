@@ -1,5 +1,6 @@
 export interface Chat {
   id: string;
+  participantId: string;
   name: string;
   avatarUrl?: string | null;
   isGroup?: boolean;
@@ -13,7 +14,11 @@ export interface Chat {
   unreadCount?: number;
 }
 
-export interface SuggestedContact {
+export interface ChatMessage {
   id: string;
-  name: string;
+  clientMessageId?: string;
+  text: string;
+  fromMe: boolean;
+  timestamp: Date;
+  status?: "sending" | "failed";
 }

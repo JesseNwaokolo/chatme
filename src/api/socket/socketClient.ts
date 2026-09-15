@@ -1,6 +1,4 @@
-import { apiClient } from "@/src/api/client";
-import { endpoints } from "@/src/api/endpoints";
-import type { RefreshTokenResponse } from "@/src/feature/auth/api/types";
+import { refreshAccessToken } from "@/src/api/client";
 import useAuthStore from "@/src/store/useAuthStore";
 import useSocketStore from "@/src/store/useSocketStore";
 import { io, Socket } from "socket.io-client";
@@ -46,12 +44,8 @@ async function handleConnectError(err: Error & { data?: { code?: string } }) {
 
   if (err.data?.code !== "AUTH_ACCESS_TOKEN_INVALID") return;
 
-  const refreshToken = useAuthStore.getState().refreshToken;
-  if (!refreshToken) return disconnectSocket();
-
   try {
-    const { data } = await apiClient.post<RefreshTokenResponse>(endpoints.auth.refresh, { refreshToken });
-    useAuthStore.getState().setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
+    await refreshAccessToken();
     reconnectSocket();
   } catch {
     disconnectSocket();

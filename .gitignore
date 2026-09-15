@@ -43,3 +43,8 @@ app-example
 /ios
 /android
 
+# local EAS build artifacts
+*.apk
+*.aab
+*.ipa
+
