@@ -6,6 +6,7 @@ import { chatKeys } from "@/src/feature/chats/api/queryKeys";
 import { Chat } from "@/src/feature/chats/types";
 import { applyUnreadCount } from "@/src/feature/chats/utils/applyUnreadCount";
 import { InAppNotificationBanner } from "@/src/shared/components/InAppNotificationBanner";
+import { registerForPushNotifications } from "@/src/shared/notifications/pushNotifications";
 import { playNotificationSound } from "@/src/shared/utils/notificationSound";
 import useActiveConversationStore from "@/src/store/useActiveConversationStore";
 import useAuthStore from "@/src/store/useAuthStore";
@@ -14,7 +15,8 @@ import useNotificationBannerStore from "@/src/store/useNotificationBannerStore";
 import useSocketStore from "@/src/store/useSocketStore";
 import useUserStore from "@/src/store/useUserStore";
 import { useQueryClient } from "@tanstack/react-query";
-import { Redirect, Stack } from "expo-router";
+import * as Notifications from "expo-notifications";
+import { Redirect, Stack, useRouter } from "expo-router";
 import { useEffect } from "react";
 import { AppState } from "react-native";
 
@@ -24,6 +26,44 @@ const AppLayout = () => {
   const status = getAuthStatus(accessToken, user);
   const isSocketConnected = useSocketStore((s) => s.isConnected);
   const queryClient = useQueryClient();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!accessToken) return;
+    registerForPushNotifications().catch((error) =>
+      console.log("[push] registration failed:", error),
+    );
+  }, [accessToken]);
+
+  useEffect(() => {
+    const openFromNotification = (response: Notifications.NotificationResponse) => {
+      const data = response.notification.request.content.data as
+        | { conversationId?: string }
+        | undefined;
+      const conversationId = data?.conversationId;
+      if (!conversationId) return;
+
+      const chat = queryClient
+        .getQueryData<Chat[]>(chatKeys.list())
+        ?.find((c) => c.id === conversationId);
+      router.push({
+        pathname: "/conversation/[id]",
+        params: {
+          id: conversationId,
+          participantId: chat?.participantId ?? "",
+          name: chat?.name ?? "",
+          avatarUrl: chat?.avatarUrl ?? "",
+        },
+      });
+    };
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(openFromNotification);
+    // App launched by tapping a notification while it was closed.
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) openFromNotification(response);
+    });
+    return () => subscription.remove();
+  }, [queryClient, router]);
 
   useEffect(() => {
     if (!accessToken) return;
