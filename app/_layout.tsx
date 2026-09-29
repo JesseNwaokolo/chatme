@@ -6,6 +6,7 @@ import useAuthStore from "@/src/store/useAuthStore";
 import { darkTheme } from "@/src/theme/colors";
 import { fontAssets } from "@/src/theme/fonts";
 import useThemeStore from "@/src/theme/useThemeStore";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
@@ -51,8 +52,10 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <KeyboardProvider>
-            <StatusBar style={isDarkTheme ? "light" : "dark"} />
-            <Stack screenOptions={{ headerShown: false }} />
+            <BottomSheetModalProvider>
+              <StatusBar style={isDarkTheme ? "light" : "dark"} />
+              <Stack screenOptions={{ headerShown: false }} />
+            </BottomSheetModalProvider>
             <Toast config={toastConfig} />
           </KeyboardProvider>
         </SafeAreaProvider>

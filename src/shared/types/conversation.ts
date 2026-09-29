@@ -1,3 +1,17 @@
+export type MessageKind = "text" | "image" | "audio" | "video" | "document";
+
+export interface MessageAttachment {
+  mediaId: string;
+  type: Exclude<MessageKind, "text">;
+  contentType: string;
+  sizeBytes: number;
+  url: string;
+  width?: number;
+  height?: number;
+  durationMs?: number;
+  filename?: string;
+}
+
 export interface ConversationParticipant {
   id: string;
   displayName: string | null;
@@ -7,7 +21,7 @@ export interface ConversationParticipant {
 export interface ConversationLatestMessage {
   id: string;
   senderId: string;
-  kind: "text";
+  kind: MessageKind;
   preview: string;
   createdAt: string;
 }
@@ -27,7 +41,7 @@ export interface ConversationSettings {
 }
 
 export interface GroupParticipant extends ConversationParticipant {
-  role: "owner" | "member";
+  role: "owner" | "admin" | "member";
 }
 
 interface ConversationResponseBase {
@@ -50,6 +64,7 @@ export interface GroupConversationResponse extends ConversationResponseBase {
   name: string;
   avatarUrl: string | null;
   participants: GroupParticipant[];
+  role?: "owner" | "admin" | "member";
 }
 
 export type ConversationResponse = DirectConversationResponse | GroupConversationResponse;

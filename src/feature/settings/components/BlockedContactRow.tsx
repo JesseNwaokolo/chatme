@@ -1,10 +1,14 @@
 import { Avatar } from "@/src/shared/components/Avatar";
 import { StyledText } from "@/src/shared/components/StyledText";
-import { ChevronLeftIcon } from "@/src/shared/icons";
 import { useTheme } from "@/src/theme/useTheme";
 import { Theme } from "@/src/theme/useThemeStore";
 import { Pressable, StyleSheet, View } from "react-native";
-import { BlockedContact } from "../data/mockBlockedContacts";
+
+export interface BlockedContact {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+}
 
 interface BlockedContactRowProps {
   contact: BlockedContact;
@@ -23,12 +27,12 @@ export const BlockedContactRow = ({ contact, onPress }: BlockedContactRowProps) 
           {contact.name}
         </StyledText>
         <StyledText size={14} style={styles.phone}>
-          {contact.phoneNumber}
+          Tap to unblock
         </StyledText>
       </View>
-      <View style={styles.chevron}>
-        <ChevronLeftIcon size={18} color={theme.textSecondary} />
-      </View>
+      <StyledText size={14} weight="bold" style={{ color: theme.buttonPrimary }}>
+        Unblock
+      </StyledText>
     </Pressable>
   );
 };

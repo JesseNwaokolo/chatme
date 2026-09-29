@@ -1,3 +1,5 @@
+import { MessageAttachment, MessageKind } from "@/src/shared/types/conversation";
+
 export interface ReceiptBoundary {
   messageId: string;
   at: string;
@@ -8,8 +10,9 @@ export interface MessageCreatedEvent {
   conversationId: string;
   clientMessageId: string;
   senderId: string;
-  kind: "text";
-  text: string;
+  kind: MessageKind;
+  text: string | null;
+  attachments?: MessageAttachment[];
   createdAt: string;
 }
 

@@ -11,9 +11,9 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Toast from "react-native-toast-message";
+import { useSetProfileAvatar } from "../api/useSetProfileAvatar";
 import { useUpdateProfile } from "../api/useUpdateProfile";
 import PhotoPickerSheet from "../components/PhotoPickerSheet";
-import { uploadAvatar } from "../utils/uploadAvatar";
 
 interface UploadPhotoProps {
   displayName: string;
@@ -27,40 +27,27 @@ const UploadPhoto = ({ displayName }: UploadPhotoProps) => {
   const [photo, setPhoto] = useState<string | null>(user?.avatarUrl ?? null);
   const [photoChanged, setPhotoChanged] = useState(false);
   const [sheetVisible, setSheetVisible] = useState(false);
-  const { mutate: updateProfile, isPending } = useUpdateProfile();
+  const { mutateAsync: updateProfile, isPending: isSavingName } = useUpdateProfile();
+  const { mutateAsync: setAvatar, isPending: isSavingAvatar } = useSetProfileAvatar();
+  const isPending = isSavingName || isSavingAvatar;
   const setUser = useUserStore((s) => s.setUser);
 
   const onSubmit = async () => {
     if (!photo) return;
-    let avatarUrl = photo;
-    if (photoChanged) {
-      try {
-        avatarUrl = await uploadAvatar(photo);
-      } catch (error) {
-        Toast.show({
-          type: "error",
-          text1: "Couldn't upload photo",
-          text2: error instanceof Error ? error.message : undefined,
-        });
-        return;
+    try {
+      let savedUser = await updateProfile({ displayName: displayName });
+      if (photoChanged) {
+        savedUser = await setAvatar(photo);
       }
+      setUser(savedUser);
+      router.replace("/(app)/(tabs)/chats");
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Couldn't save profile",
+        text2: error instanceof Error ? error.message : undefined,
+      });
     }
-    updateProfile(
-      { displayName, avatarUrl },
-      {
-        onSuccess: (user) => {
-          setUser(user);
-          router.replace("/(app)/(tabs)/chats");
-        },
-        onError: (error) => {
-          Toast.show({
-            type: "error",
-            text1: "Couldn't save profile",
-            text2: error.message,
-          });
-        },
-      },
-    );
   };
 
   return (

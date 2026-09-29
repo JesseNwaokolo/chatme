@@ -64,7 +64,6 @@ export interface LogoutRequest {
 
 export interface UpdateProfileRequest {
   displayName: string;
-  avatarUrl: string;
 }
 
 export type UpdateProfileResponse = AuthUser;

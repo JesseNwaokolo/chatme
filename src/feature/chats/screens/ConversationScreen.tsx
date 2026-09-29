@@ -20,11 +20,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as Contacts from "expo-contacts";
 import * as Crypto from "expo-crypto";
 import * as DocumentPicker from "expo-document-picker";
+import * as Location from "expo-location";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { setStatusBarStyle } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -34,16 +36,27 @@ import {
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
+import { getMimeType, uploadMedia } from "@/src/shared/media/mediaApi";
 import { markRead } from "../api/messagesApi";
 import { useMessages } from "../api/useMessages";
+import { useDeleteMessage, useEditMessage, useReactToMessage } from "../api/useMessageActions";
 import { useSendMessage } from "../api/useSendMessage";
 import { AttachmentPickerSheet } from "../components/AttachmentPickerSheet";
+import { MessageActionsModal } from "../components/MessageActionsModal";
 import { MessageBubble } from "../components/MessageBubble";
 import VirtualizedListScrollView from "../components/VirtualizedListScrollView";
 import { useConversationSocket } from "../hooks/useConversationSocket";
-import { ChatMessage } from "../types";
+import { ChatMessage, PickedMedia } from "../types";
 import { applyUnreadCount } from "../utils/applyUnreadCount";
 import { getReceiptStatus, toChatMessage, upsertMessages } from "../utils/messages";
+
+interface LocalAttachment {
+  type: "image" | "video" | "audio" | "document";
+  uri: string;
+  contentType: string;
+  filename: string;
+  sizeBytes?: number;
+}
 
 const TYPING_PAUSE_MS = 3000;
 const COMPOSER_FALLBACK_HEIGHT = 72;
@@ -77,6 +90,11 @@ const ConversationScreen = () => {
     refetch: refetchMessages,
   } = useMessages(id);
   const sendMessageMutation = useSendMessage(id);
+  const editMessageMutation = useEditMessage(id);
+  const deleteMessageMutation = useDeleteMessage(id);
+  const reactMutation = useReactToMessage(id);
+  const [actionMessage, setActionMessage] = useState<ChatMessage | null>(null);
+  const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const isFocused = useIsFocused();
   const isSocketConnected = useSocketStore((s) => s.isConnected);
   const queryClient = useQueryClient();
@@ -147,73 +165,227 @@ const ConversationScreen = () => {
     onMessageCreated: handleMessageCreated,
   });
 
-  const handleSend = () => {
-    const text = draft.trim();
-    if (!text) return;
-
+  const dispatchMessage = async ({
+    text,
+    attachments,
+  }: {
+    text?: string;
+    attachments?: LocalAttachment[];
+  }) => {
     const clientMessageId = Crypto.randomUUID();
     setMessages((prev) =>
       upsertMessages(prev, [
         {
           id: clientMessageId,
           clientMessageId,
-          text,
+          text: text ?? "",
+          attachments: attachments?.map((a) => ({
+            type: a.type,
+            url: a.uri,
+            filename: a.filename,
+            contentType: a.contentType,
+          })),
           fromMe: true,
           timestamp: new Date(),
           status: "sending",
         },
       ]),
     );
-    setDraft("");
-    stopTypingNow();
 
-    sendMessageMutation.mutate(
-      { clientMessageId, text },
+    try {
+      const attachmentMediaIds = attachments?.length
+        ? await Promise.all(
+            attachments.map(async (a) => {
+              const media = await uploadMedia({
+                uri: a.uri,
+                purpose: "message_attachment",
+                contentType: a.contentType,
+                filename: a.filename,
+                sizeBytes: a.sizeBytes,
+              });
+              return media.id;
+            }),
+          )
+        : undefined;
+
+      const data = await sendMessageMutation.mutateAsync({
+        clientMessageId,
+        text: text || undefined,
+        attachmentMediaIds,
+      });
+      const myUserId = useUserStore.getState().user?.id;
+      setMessages((prev) => upsertMessages(prev, [toChatMessage(data, myUserId)]));
+    } catch {
+      setMessages((prev) => prev.filter((m) => m.clientMessageId !== clientMessageId));
+      Toast.show({
+        type: "error",
+        text1: "Couldn't send message",
+        text2: "Please try again.",
+      });
+    }
+  };
+
+  const applyServerMessage = (data: Parameters<typeof toChatMessage>[0]) => {
+    const myUserId = useUserStore.getState().user?.id;
+    setMessages((prev) => upsertMessages(prev, [toChatMessage(data, myUserId)]));
+  };
+
+  const handleReact = (message: ChatMessage, emoji: string | null) => {
+    reactMutation.mutate(
+      { messageId: message.id, emoji },
       {
-        onSuccess: (data) => {
-          const myUserId = useUserStore.getState().user?.id;
-          setMessages((prev) => upsertMessages(prev, [toChatMessage(data, myUserId)]));
-        },
-        onError: () => {
-          setMessages((prev) => prev.filter((m) => m.clientMessageId !== clientMessageId));
-          Toast.show({
-            type: "error",
-            text1: "Couldn't send message",
-            text2: "Please try again.",
-          });
-        },
+        onSuccess: applyServerMessage,
+        onError: () => Toast.show({ type: "error", text1: "Couldn't update reaction" }),
       },
     );
+  };
+
+  const handleDeleteMessage = (message: ChatMessage) => {
+    Alert.alert("Delete message", "This deletes the message for everyone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () =>
+          deleteMessageMutation.mutate(message.id, {
+            onSuccess: applyServerMessage,
+            onError: () => Toast.show({ type: "error", text1: "Couldn't delete message" }),
+          }),
+      },
+    ]);
+  };
+
+  const handleStartEdit = (message: ChatMessage) => {
+    setEditingMessage(message);
+    setDraft(message.text);
+  };
+
+  const cancelEdit = () => {
+    setEditingMessage(null);
+    setDraft("");
+  };
+
+  const handleSend = () => {
+    const text = draft.trim();
+
+    if (editingMessage) {
+      // Attachment captions may be cleared (null); text-only messages need text.
+      if (!text && !editingMessage.attachments?.length) return;
+      editMessageMutation.mutate(
+        {
+          messageId: editingMessage.id,
+          text: text || null,
+          expectedVersion: editingMessage.version ?? 0,
+        },
+        {
+          onSuccess: (data) => {
+            applyServerMessage(data);
+            cancelEdit();
+          },
+          onError: () =>
+            Toast.show({
+              type: "error",
+              text1: "Couldn't edit message",
+              text2: "It may have changed. Please try again.",
+            }),
+        },
+      );
+      return;
+    }
+
+    if (!text) return;
+
+    setDraft("");
+    stopTypingNow();
+    dispatchMessage({ text });
   };
 
   const handleLoadOlder = () => {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
   };
 
-  const notifyAttachmentUnsupported = (label: string) => {
-    Toast.show({ type: "info", text1: `Sharing a ${label.toLowerCase()} isn't supported yet` });
-  };
-
-  const handlePickImage = (_uri: string) => {
+  const handlePickMedia = (items: PickedMedia[]) => {
     setShowAttachments(false);
-    notifyAttachmentUnsupported("photo");
+    if (items.length === 0) return;
+
+    const hasVideo = items.some((item) => item.kind === "video");
+    if (hasVideo && items.length > 1) {
+      Toast.show({
+        type: "info",
+        text1: "Send one video at a time",
+        text2: "Videos can't be combined with other media.",
+      });
+      return;
+    }
+
+    dispatchMessage({
+      attachments: items.map((item) => {
+        const contentType =
+          item.mimeType ?? (item.kind === "video" ? "video/mp4" : getMimeType(item.uri));
+        const extension = contentType.split("/")[1] ?? "jpg";
+        return {
+          type: item.kind,
+          uri: item.uri,
+          contentType,
+          filename: item.fileName ?? `${item.kind}-${Date.now()}.${extension}`,
+          sizeBytes: item.fileSize,
+        };
+      }),
+    });
   };
 
   const handlePickDocument = async () => {
     const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
     setShowAttachments(false);
-    if (!result.canceled) notifyAttachmentUnsupported("document");
+    if (result.canceled) return;
+
+    const doc = result.assets[0];
+    dispatchMessage({
+      attachments: [
+        {
+          type: "document",
+          uri: doc.uri,
+          contentType: doc.mimeType ?? getMimeType(doc.name),
+          filename: doc.name,
+          sizeBytes: doc.size,
+        },
+      ],
+    });
   };
 
   const handlePickContact = async () => {
     const contact = await Contacts.presentContactPickerAsync();
     setShowAttachments(false);
-    if (contact) notifyAttachmentUnsupported("contact");
+    if (!contact) return;
+
+    const name = contact.name ?? "Contact";
+    const numbers = (contact.phoneNumbers ?? []).map((p) => p.number).filter(Boolean);
+    dispatchMessage({ text: [`👤 ${name}`, ...numbers].join("\n") });
   };
 
-  const handlePickLocation = () => {
+  const handlePickLocation = async () => {
     setShowAttachments(false);
-    notifyAttachmentUnsupported("location");
+
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      Toast.show({
+        type: "error",
+        text1: "Location permission needed",
+        text2: "Allow location access to share where you are.",
+      });
+      return;
+    }
+
+    try {
+      const { coords } = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      dispatchMessage({
+        text: `📍 My location\nhttps://maps.google.com/?q=${coords.latitude},${coords.longitude}`,
+      });
+    } catch {
+      Toast.show({ type: "error", text1: "Couldn't get your location" });
+    }
   };
 
   useEffect(() => {
@@ -290,6 +462,7 @@ const ConversationScreen = () => {
                 ? getReceiptStatus(item, otherReceipt)
                 : undefined
             }
+            onLongPress={setActionMessage}
           />
         )}
         contentContainerStyle={styles.messagesContent}
@@ -308,11 +481,23 @@ const ConversationScreen = () => {
       <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
         {showAttachments && (
           <AttachmentPickerSheet
-            onPickImage={handlePickImage}
+            onPickMedia={handlePickMedia}
             onPickDocument={handlePickDocument}
             onPickContact={handlePickContact}
             onPickLocation={handlePickLocation}
           />
+        )}
+        {editingMessage && (
+          <View style={styles.editBanner}>
+            <StyledText size={13} weight="medium" style={{ color: theme.textSecondary, flex: 1 }}>
+              Editing message
+            </StyledText>
+            <Pressable hitSlop={8} onPress={cancelEdit}>
+              <StyledText size={13} weight="bold" style={{ color: theme.buttonPrimary }}>
+                Cancel
+              </StyledText>
+            </Pressable>
+          </View>
         )}
         <View
           style={[styles.composer, { paddingBottom: insets.bottom + 12 }]}
@@ -338,6 +523,15 @@ const ConversationScreen = () => {
           </Pressable>
         </View>
       </KeyboardStickyView>
+
+      <MessageActionsModal
+        message={actionMessage}
+        myUserId={useUserStore.getState().user?.id}
+        onClose={() => setActionMessage(null)}
+        onReact={handleReact}
+        onEdit={handleStartEdit}
+        onDelete={handleDeleteMessage}
+      />
     </View>
   );
 };
@@ -370,6 +564,13 @@ const makeStyles = (theme: Theme) =>
     },
     messages: {
       flex: 1,
+    },
+    editBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      backgroundColor: theme.bgNeutral,
     },
     messagesContent: {
       paddingHorizontal: 16,

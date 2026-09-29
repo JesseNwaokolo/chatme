@@ -18,7 +18,7 @@ import Swipeable, {
 import Toast from "react-native-toast-message";
 import { useArchiveConversation, useUnarchiveConversation } from "../api/useArchiveConversation";
 import { usePinConversation, useUnpinConversation } from "../api/usePinConversation";
-import useMutedChatsStore from "@/src/store/useMutedChatsStore";
+import { useMuteToggle } from "../api/useMuteToggle";
 import { Chat } from "../types";
 import { Avatar } from "@/src/shared/components/Avatar";
 import { SwipeActionButton } from "./SwipeActionButton";
@@ -37,9 +37,7 @@ export const ChatListItem = ({ chat, onPress }: ChatListItemProps) => {
   const unarchiveMutation = useUnarchiveConversation();
   const pinMutation = usePinConversation();
   const unpinMutation = useUnpinConversation();
-  const isMuted = useMutedChatsStore((s) => s.mutedConversationIds.includes(chat.id));
-  const muteChat = useMutedChatsStore((s) => s.mute);
-  const unmuteChat = useMutedChatsStore((s) => s.unmute);
+  const { isMuted, setMuted } = useMuteToggle(chat.id, chat.muted);
 
   const [openDirection, setOpenDirection] = useState<SwipeDirection | null>(null);
 
@@ -54,11 +52,7 @@ export const ChatListItem = ({ chat, onPress }: ChatListItemProps) => {
         backgroundColor={theme.warning}
         onPress={() => {
           swipeableRef.current?.close();
-          if (isMuted) {
-            unmuteChat(chat.id);
-          } else {
-            muteChat(chat.id);
-          }
+          setMuted(!isMuted);
         }}
       />
       <SwipeActionButton

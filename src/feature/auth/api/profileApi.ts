@@ -9,3 +9,9 @@ export const updateProfile = (payload: UpdateProfileRequest) =>
   apiClient
     .patch<UpdateProfileResponse>(endpoints.user.updateProfile, payload)
     .then((res) => res.data);
+
+export const setProfileAvatar = (mediaId: string) =>
+  apiClient.put<AuthUser>(endpoints.user.avatar, { mediaId }).then((res) => res.data);
+
+export const removeProfileAvatar = () =>
+  apiClient.delete<void>(endpoints.user.avatar).then(() => undefined);

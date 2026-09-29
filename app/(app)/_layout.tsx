@@ -60,7 +60,7 @@ const AppLayout = () => {
       const chats = queryClient.getQueryData<Chat[]>(chatKeys.list());
       const chat = chats?.find((c) => c.id === payload.conversationId);
       if (!chat) return;
-      if (useMutedChatsStore.getState().isMuted(chat.id)) return;
+      if (chat.muted || useMutedChatsStore.getState().isMuted(chat.id)) return;
 
       playNotificationSound();
 
@@ -71,7 +71,15 @@ const AppLayout = () => {
         name: chat.name,
         avatarUrl: chat.avatarUrl,
         isGroup: chat.isGroup,
-        text: payload.text,
+        text:
+          payload.text ||
+          {
+            image: "📷 Photo",
+            video: "🎥 Video",
+            audio: "🎤 Voice message",
+            document: "📄 Document",
+            text: "",
+          }[payload.kind],
       });
     };
 

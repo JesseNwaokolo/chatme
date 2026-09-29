@@ -16,6 +16,7 @@ interface NewChatMenuProps {
   onDismiss: () => void;
   onSelectNewChat: () => void;
   onSelectNewContact: () => void;
+  onSelectNewGroup: () => void;
 }
 
 const PILLS = [
@@ -29,6 +30,7 @@ export const NewChatMenu = ({
   onDismiss,
   onSelectNewChat,
   onSelectNewContact,
+  onSelectNewGroup,
 }: NewChatMenuProps) => {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
@@ -54,7 +56,7 @@ export const NewChatMenu = ({
       onSelectNewContact();
       return;
     }
-    onDismiss();
+    onSelectNewGroup();
   };
 
   return (

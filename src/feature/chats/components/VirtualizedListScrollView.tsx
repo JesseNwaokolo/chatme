@@ -1,13 +1,13 @@
 import { forwardRef } from "react";
 import type { ScrollViewProps } from "react-native";
+import type Reanimated from "react-native-reanimated";
 import {
   KeyboardChatScrollView,
   type KeyboardChatScrollViewProps,
-  type KeyboardChatScrollViewRef,
 } from "react-native-keyboard-controller";
 
 const VirtualizedListScrollView = forwardRef<
-  KeyboardChatScrollViewRef,
+  Reanimated.ScrollView,
   ScrollViewProps & KeyboardChatScrollViewProps
 >((props, ref) => {
   return (

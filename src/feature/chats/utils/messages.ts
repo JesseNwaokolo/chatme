@@ -6,7 +6,19 @@ export function toChatMessage(payload: MessageResponse, myUserId?: string): Chat
   return {
     id: payload.id,
     clientMessageId: payload.clientMessageId,
-    text: payload.text,
+    text: payload.text ?? "",
+    attachments: payload.attachments?.map((a) => ({
+      type: a.type,
+      url: a.url,
+      filename: a.filename,
+      contentType: a.contentType,
+      width: a.width,
+      height: a.height,
+    })),
+    version: payload.version,
+    edited: !!payload.editedAt,
+    deleted: !!payload.deletedAt,
+    reactions: payload.reactions,
     fromMe: payload.senderId === myUserId,
     timestamp: new Date(payload.createdAt),
   };

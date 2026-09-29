@@ -3,16 +3,33 @@ import { ChevronLeftIcon } from "@/src/shared/icons";
 import { useTheme } from "@/src/theme/useTheme";
 import { Theme } from "@/src/theme/useThemeStore";
 import { useRouter } from "expo-router";
-import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlockedContactRow } from "../components/BlockedContactRow";
-import { mockBlockedContacts } from "../data/mockBlockedContacts";
+import { useBlockedUsers, useUnblockUser } from "@/src/feature/blocks/api/useBlocks";
+import Toast from "react-native-toast-message";
 
 const BlockedContactScreen = () => {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  const { data: blocked, isLoading, isError, refetch } = useBlockedUsers();
+  const unblock = useUnblockUser();
+
+  const confirmUnblock = (userId: string, name: string) => {
+    Alert.alert("Unblock contact", `Unblock ${name}?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Unblock",
+        onPress: () =>
+          unblock.mutate(userId, {
+            onError: () => Toast.show({ type: "error", text1: "Couldn't unblock contact" }),
+          }),
+      },
+    ]);
+  };
 
   return (
     <View style={styles.container}>
@@ -32,13 +49,30 @@ const BlockedContactScreen = () => {
       </View>
 
       <FlatList
-        data={mockBlockedContacts}
-        keyExtractor={(item) => item.id}
+        data={blocked ?? []}
+        keyExtractor={(item) => item.user.id}
+        refreshing={false}
+        onRefresh={refetch}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <BlockedContactRow contact={item} onPress={() => {}} />
-        )}
+        renderItem={({ item }) => {
+          const name = item.user.displayName ?? "Unknown";
+          return (
+            <BlockedContactRow
+              contact={{ id: item.user.id, name, avatarUrl: item.user.avatarUrl }}
+              onPress={() => confirmUnblock(item.user.id, name)}
+            />
+          );
+        }}
+        ListEmptyComponent={
+          isLoading ? (
+            <ActivityIndicator color={theme.buttonPrimary} style={{ marginTop: 40 }} />
+          ) : (
+            <StyledText style={{ color: theme.textSecondary, textAlign: "center", marginTop: 40 }}>
+              {isError ? "Couldn't load blocked contacts." : "You haven't blocked anyone."}
+            </StyledText>
+          )
+        }
         ListFooterComponent={
           <StyledText size={13} style={styles.caption}>
             Blocked contacts can&apos;t send messages and call you.

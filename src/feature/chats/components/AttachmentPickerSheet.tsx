@@ -6,18 +6,19 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, View } from "react-native";
+import { PickedMedia } from "../types";
+import { ActivityIndicator, Alert, FlatList, Platform, Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeInDown, FadeOutDown } from "react-native-reanimated";
 
 interface AttachmentPickerSheetProps {
-  onPickImage: (uri: string) => void;
+  onPickMedia: (items: PickedMedia[]) => void;
   onPickDocument: () => void;
   onPickContact: () => void;
   onPickLocation: () => void;
 }
 
 export const AttachmentPickerSheet = ({
-  onPickImage,
+  onPickMedia,
   onPickDocument,
   onPickContact,
   onPickLocation,
@@ -39,7 +40,7 @@ export const AttachmentPickerSheet = ({
       }
 
       const { assets } = await MediaLibrary.getAssetsAsync({
-        mediaType: "photo",
+        mediaType: ["photo", "video"],
         sortBy: "creationTime",
         first: 30,
       });
@@ -54,6 +55,14 @@ export const AttachmentPickerSheet = ({
     };
   }, []);
 
+  const toPicked = (asset: ImagePicker.ImagePickerAsset): PickedMedia => ({
+    uri: asset.uri,
+    kind: asset.type === "video" ? "video" : "image",
+    mimeType: asset.mimeType,
+    fileName: asset.fileName ?? undefined,
+    fileSize: asset.fileSize,
+  });
+
   const handleTakePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
@@ -62,7 +71,7 @@ export const AttachmentPickerSheet = ({
     }
 
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.8 });
-    if (!result.canceled) onPickImage(result.assets[0].uri);
+    if (!result.canceled) onPickMedia(result.assets.map(toPicked));
   };
 
   const handleChooseFromLibrary = async () => {
@@ -72,8 +81,33 @@ export const AttachmentPickerSheet = ({
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 });
-    if (!result.canceled) onPickImage(result.assets[0].uri);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images", "videos"],
+      allowsMultipleSelection: true,
+      selectionLimit: 10,
+      quality: 0.8,
+    });
+    if (!result.canceled) onPickMedia(result.assets.map(toPicked));
+  };
+
+  const handleThumbnailPress = async (asset: MediaLibrary.Asset) => {
+    // Android URIs are already readable; resolving info there needs ACCESS_MEDIA_LOCATION.
+    // iOS `ph://` URIs must be resolved to a local file.
+    let uri = asset.uri;
+    if (Platform.OS === "ios") {
+      try {
+        uri = (await MediaLibrary.getAssetInfoAsync(asset)).localUri ?? asset.uri;
+      } catch {
+        uri = asset.uri;
+      }
+    }
+    onPickMedia([
+      {
+        uri,
+        kind: asset.mediaType === "video" ? "video" : "image",
+        fileName: asset.filename,
+      },
+    ]);
   };
 
   return (
@@ -98,7 +132,7 @@ export const AttachmentPickerSheet = ({
               </Pressable>
             }
             renderItem={({ item }) => (
-              <Pressable onPress={() => onPickImage(item.uri)}>
+              <Pressable onPress={() => handleThumbnailPress(item)}>
                 <Image source={{ uri: item.uri }} style={styles.thumb} contentFit="cover" />
               </Pressable>
             )}

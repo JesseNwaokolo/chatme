@@ -1,6 +1,6 @@
+import { useSetProfileAvatar } from "@/src/feature/auth/api/useSetProfileAvatar";
 import { useUpdateProfile } from "@/src/feature/auth/api/useUpdateProfile";
 import PhotoPickerSheet from "@/src/feature/auth/components/PhotoPickerSheet";
-import { uploadAvatar } from "@/src/feature/auth/utils/uploadAvatar";
 import { getLineHeight } from "@/src/helpers/lineHeight";
 import { Avatar } from "@/src/shared/components/Avatar";
 import { Button } from "@/src/shared/components/Button";
@@ -38,7 +38,9 @@ const EditProfile = () => {
   const [photoChanged, setPhotoChanged] = useState(false);
   const [sheetVisible, setSheetVisible] = useState(false);
 
-  const { mutate: updateProfile, isPending } = useUpdateProfile();
+  const { mutateAsync: updateProfile, isPending: isSavingName } = useUpdateProfile();
+  const { mutateAsync: setAvatar, isPending: isSavingAvatar } = useSetProfileAvatar();
+  const isPending = isSavingName || isSavingAvatar;
 
   const country = useMemo(
     () =>
@@ -48,35 +50,20 @@ const EditProfile = () => {
 
   const onSubmit = async () => {
     if (!name || !photo) return;
-    let avatarUrl = photo;
-    if (photoChanged) {
-      try {
-        avatarUrl = await uploadAvatar(photo);
-      } catch (error) {
-        Toast.show({
-          type: "error",
-          text1: "Couldn't upload photo",
-          text2: error instanceof Error ? error.message : undefined,
-        });
-        return;
+    try {
+      let savedUser = await updateProfile({ displayName: name });
+      if (photoChanged) {
+        savedUser = await setAvatar(photo);
       }
+      setUser(savedUser);
+      router.back();
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Couldn't save profile",
+        text2: error instanceof Error ? error.message : undefined,
+      });
     }
-    updateProfile(
-      { displayName: name, avatarUrl },
-      {
-        onSuccess: (updatedUser) => {
-          setUser(updatedUser);
-          router.back();
-        },
-        onError: (error) => {
-          Toast.show({
-            type: "error",
-            text1: "Couldn't save profile",
-            text2: error.message,
-          });
-        },
-      },
-    );
   };
 
   return (

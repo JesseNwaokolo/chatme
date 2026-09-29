@@ -93,6 +93,12 @@ const SettingsScreen = () => {
             onPress={() => router.push("/star-messages")}
           />
           <SettingsRow
+            icon={<StarIcon color={theme.buttonPrimary} filled />}
+            label="Favorite chats"
+            type="nav"
+            onPress={() => router.push("/favorites")}
+          />
+          <SettingsRow
             icon={<PhoneIcon color={theme.buttonPrimary} />}
             label="Last call"
             type="nav"

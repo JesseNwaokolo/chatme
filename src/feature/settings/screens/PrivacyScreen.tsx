@@ -6,7 +6,7 @@ import { useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PrivacyRow } from "../components/PrivacyRow";
-import { mockBlockedContacts } from "../data/mockBlockedContacts";
+import { useBlockedUsers } from "@/src/feature/blocks/api/useBlocks";
 import useSecurityStore from "@/src/store/useSecurityStore";
 
 interface PrivacyOption {
@@ -22,6 +22,7 @@ const PrivacyScreen = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const faceIdEnabled = useSecurityStore((s) => s.faceIdEnabled);
+  const { data: blockedUsers } = useBlockedUsers();
 
   const PRIVACY_OPTIONS: PrivacyOption[] = [
     {
@@ -36,7 +37,7 @@ const PrivacyScreen = () => {
     {
       key: "blockedContact",
       label: "Blocked Contact",
-      value: `${mockBlockedContacts.length} Contacts`,
+      value: `${blockedUsers?.length ?? 0} Contacts`,
       onPress: () => router.push("/blocked-contact"),
     },
     {

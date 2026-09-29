@@ -1,15 +1,18 @@
 import { PlusIcon } from "@/src/shared/icons";
 import useThemeStore from "@/src/theme/useThemeStore";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, StyleSheet } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { NewChatMenu } from "./NewChatMenu";
+import { NewGroupSheet, NewGroupSheetRef } from "./NewGroupSheet";
 
 export const NewChatFab = () => {
   const { accentColor } = useThemeStore();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const groupSheetRef = useRef<NewGroupSheetRef>(null);
 
   const rotation = useSharedValue(0);
 
@@ -34,6 +37,11 @@ export const NewChatFab = () => {
     router.push("/new-contact");
   };
 
+  const handleNewGroup = () => {
+    closeMenu();
+    groupSheetRef.current?.present();
+  };
+
   const iconAnimStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],
   }));
@@ -45,7 +53,9 @@ export const NewChatFab = () => {
         onDismiss={closeMenu}
         onSelectNewChat={handleNewChat}
         onSelectNewContact={handleNewContact}
+        onSelectNewGroup={handleNewGroup}
       />
+      <NewGroupSheet ref={groupSheetRef} />
       <Pressable style={styles.fab} onPress={toggleMenu}>
         <Animated.View style={iconAnimStyle}>
           <PlusIcon color={accentColor} />
