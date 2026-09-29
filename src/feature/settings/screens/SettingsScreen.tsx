@@ -90,13 +90,13 @@ const SettingsScreen = () => {
             icon={<StarIcon color={theme.buttonPrimary} />}
             label="Star messages"
             type="nav"
-            onPress={() => {}}
+            onPress={() => router.push("/star-messages")}
           />
           <SettingsRow
             icon={<PhoneIcon color={theme.buttonPrimary} />}
             label="Last call"
             type="nav"
-            onPress={() => {}}
+            onPress={() => router.push("/last-call")}
           />
           <SettingsRow
             icon={<PeopleIcon color={theme.buttonPrimary} />}
@@ -126,19 +126,19 @@ const SettingsScreen = () => {
             icon={<LockOutlineIcon color={theme.buttonPrimary} />}
             label="Privacy"
             type="nav"
-            onPress={() => {}}
+            onPress={() => router.push("/privacy")}
           />
           <SettingsRow
             icon={<DatabaseIcon color={theme.buttonPrimary} />}
             label="Data and storage"
             type="nav"
-            onPress={() => {}}
+            onPress={() => router.push("/data-storage")}
           />
           <SettingsRow
             icon={<QuestionCircleIcon color={theme.buttonPrimary} />}
             label="FAQ"
             type="nav"
-            onPress={() => {}}
+            onPress={() => router.push("/faq")}
           />
           <SettingsRow
             icon={<LogoutIcon color={theme.danger} />}

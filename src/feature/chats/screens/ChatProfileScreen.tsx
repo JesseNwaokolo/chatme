@@ -16,15 +16,15 @@ import { useTheme } from "@/src/theme/useTheme";
 import { Theme } from "@/src/theme/useThemeStore";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { setStatusBarStyle } from "expo-status-bar";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import useMutedChatsStore from "@/src/store/useMutedChatsStore";
 import { useConversation } from "../api/useConversation";
 
 const HERO_HEIGHT = 420;
 const FAB_SIZE = 56;
 
-// Mock placeholders: only name and avatar come from the API right now.
 const MOCK_LAST_SEEN = "Last seen 24 minutes ago";
 const MOCK_PHONE_NUMBER = "+1 234 567 8900";
 const MOCK_DESCRIPTION = "Available";
@@ -41,11 +41,9 @@ const ChatProfileScreen = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const { data } = useConversation(id);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-
-  useEffect(() => {
-    if (data?.settings) setNotificationsEnabled(!data.settings.muted);
-  }, [data?.settings]);
+  const isMuted = useMutedChatsStore((s) => (id ? s.mutedConversationIds.includes(id) : false));
+  const muteChat = useMutedChatsStore((s) => s.mute);
+  const unmuteChat = useMutedChatsStore((s) => s.unmute);
 
   useFocusEffect(
     useCallback(() => {
@@ -54,8 +52,12 @@ const ChatProfileScreen = () => {
     }, [])
   );
 
-  const name = data?.otherParticipant.displayName ?? "Unknown";
-  const avatarUrl = data?.otherParticipant.avatarUrl;
+  const name = data
+    ? data.type === "group"
+      ? data.name
+      : (data.otherParticipant.displayName ?? "Unknown")
+    : "Unknown";
+  const avatarUrl = data ? (data.type === "group" ? data.avatarUrl : data.otherParticipant.avatarUrl) : undefined;
 
   return (
     <ScrollView style={styles.container} bounces={false}>
@@ -67,8 +69,6 @@ const ChatProfileScreen = () => {
             <Avatar name={name} size={160} />
           </View>
         )}
-        <View style={styles.heroOverlay} />
-
         <View style={[styles.heroTopRow, { paddingTop: insets.top + 12 }]}>
           <Pressable style={styles.heroButton} onPress={() => router.back()} hitSlop={12}>
             <ChevronLeftIcon size={20} color="#FFFFFF" />
@@ -158,8 +158,12 @@ const ChatProfileScreen = () => {
           icon={<BellIcon color={theme.buttonPrimary} />}
           label="Notifications"
           type="toggle"
-          value={notificationsEnabled}
-          onToggle={setNotificationsEnabled}
+          value={!isMuted}
+          onToggle={(enabled) => {
+            if (!id) return;
+            if (enabled) unmuteChat(id);
+            else muteChat(id);
+          }}
         />
 
         <View style={styles.divider} />
@@ -194,14 +198,6 @@ const makeStyles = (theme: Theme) =>
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: theme.bgPrimaryLight,
-    },
-    heroOverlay: {
-      position: "absolute",
-      left: 0,
-      right: 0,
-      bottom: 0,
-      height: HERO_HEIGHT * 0.5,
-      backgroundColor: "rgba(8, 28, 44, 0.45)",
     },
     heroTopRow: {
       position: "absolute",

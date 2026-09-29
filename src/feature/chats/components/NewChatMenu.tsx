@@ -15,6 +15,7 @@ interface NewChatMenuProps {
   visible: boolean;
   onDismiss: () => void;
   onSelectNewChat: () => void;
+  onSelectNewContact: () => void;
 }
 
 const PILLS = [
@@ -27,6 +28,7 @@ export const NewChatMenu = ({
   visible,
   onDismiss,
   onSelectNewChat,
+  onSelectNewContact,
 }: NewChatMenuProps) => {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
@@ -46,6 +48,10 @@ export const NewChatMenu = ({
   const handlePress = (key: (typeof PILLS)[number]["key"]) => {
     if (key === "newChat") {
       onSelectNewChat();
+      return;
+    }
+    if (key === "newContact") {
+      onSelectNewContact();
       return;
     }
     onDismiss();

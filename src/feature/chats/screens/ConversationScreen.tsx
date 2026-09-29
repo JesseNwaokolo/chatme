@@ -9,6 +9,7 @@ import {
   SendIcon,
   VideoCallIcon,
 } from "@/src/shared/icons";
+import useActiveConversationStore from "@/src/store/useActiveConversationStore";
 import useSocketStore from "@/src/store/useSocketStore";
 import useUserStore from "@/src/store/useUserStore";
 import { darkTheme } from "@/src/theme/colors";
@@ -16,7 +17,9 @@ import { useTheme } from "@/src/theme/useTheme";
 import { Theme } from "@/src/theme/useThemeStore";
 import { useIsFocused } from "@react-navigation/native";
 import { useQueryClient } from "@tanstack/react-query";
+import * as Contacts from "expo-contacts";
 import * as Crypto from "expo-crypto";
+import * as DocumentPicker from "expo-document-picker";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { setStatusBarStyle } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -34,6 +37,7 @@ import Toast from "react-native-toast-message";
 import { markRead } from "../api/messagesApi";
 import { useMessages } from "../api/useMessages";
 import { useSendMessage } from "../api/useSendMessage";
+import { AttachmentPickerSheet } from "../components/AttachmentPickerSheet";
 import { MessageBubble } from "../components/MessageBubble";
 import VirtualizedListScrollView from "../components/VirtualizedListScrollView";
 import { useConversationSocket } from "../hooks/useConversationSocket";
@@ -63,6 +67,7 @@ const ConversationScreen = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [composerHeight, setComposerHeight] = useState(COMPOSER_FALLBACK_HEIGHT);
+  const [showAttachments, setShowAttachments] = useState(false);
 
   const {
     data: historyData,
@@ -110,10 +115,6 @@ const ConversationScreen = () => {
     const isFirstLoad = lastMessageIdRef.current === null;
     lastMessageIdRef.current = last.id;
     requestAnimationFrame(() => {
-      // Reanimated's ScrollView (used under VirtualizedListScrollView) doesn't
-      // reliably support scrollToEnd, so scroll to a deliberately oversized
-      // offset instead — the native scroll view clamps to the real content
-      // bounds regardless of what JS thinks the content height is.
       listRef.current?.scrollToOffset({ offset: 1e7, animated: !isFirstLoad });
     });
   }, [messages]);
@@ -189,6 +190,32 @@ const ConversationScreen = () => {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
   };
 
+  const notifyAttachmentUnsupported = (label: string) => {
+    Toast.show({ type: "info", text1: `Sharing a ${label.toLowerCase()} isn't supported yet` });
+  };
+
+  const handlePickImage = (_uri: string) => {
+    setShowAttachments(false);
+    notifyAttachmentUnsupported("photo");
+  };
+
+  const handlePickDocument = async () => {
+    const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
+    setShowAttachments(false);
+    if (!result.canceled) notifyAttachmentUnsupported("document");
+  };
+
+  const handlePickContact = async () => {
+    const contact = await Contacts.presentContactPickerAsync();
+    setShowAttachments(false);
+    if (contact) notifyAttachmentUnsupported("contact");
+  };
+
+  const handlePickLocation = () => {
+    setShowAttachments(false);
+    notifyAttachmentUnsupported("location");
+  };
+
   useEffect(() => {
     if (!isFocused) return;
 
@@ -200,6 +227,15 @@ const ConversationScreen = () => {
       .then((data) => applyUnreadCount(queryClient, data.conversationId, data.unreadCount))
       .catch(() => {});
   }, [isFocused, messages, id, queryClient]);
+
+  useEffect(() => {
+    useActiveConversationStore.getState().setActiveConversationId(isFocused ? id : null);
+    return () => {
+      if (useActiveConversationStore.getState().activeConversationId === id) {
+        useActiveConversationStore.getState().setActiveConversationId(null);
+      }
+    };
+  }, [isFocused, id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -270,11 +306,19 @@ const ConversationScreen = () => {
       />
 
       <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
+        {showAttachments && (
+          <AttachmentPickerSheet
+            onPickImage={handlePickImage}
+            onPickDocument={handlePickDocument}
+            onPickContact={handlePickContact}
+            onPickLocation={handlePickLocation}
+          />
+        )}
         <View
           style={[styles.composer, { paddingBottom: insets.bottom + 12 }]}
           onLayout={(e) => setComposerHeight(e.nativeEvent.layout.height)}
         >
-          <Pressable hitSlop={8}>
+          <Pressable hitSlop={8} onPress={() => setShowAttachments((prev) => !prev)}>
             <PaperclipIcon size={22} color={theme.textSecondary} />
           </Pressable>
           <TextInput

@@ -65,10 +65,6 @@ export function useVisiblePresence() {
       updateVisible(lastVisibleRef.current);
       return;
     }
-    // The server-side subscriptions die with the connection, so our local
-    // bookkeeping is stale once reconnected — clear it so updateVisible
-    // above re-subscribes everything currently visible instead of assuming
-    // it's still subscribed.
     subscribedRef.current.clear();
     setOnlineByConversationId({});
   }, [isConnected, updateVisible]);

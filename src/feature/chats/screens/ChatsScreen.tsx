@@ -17,10 +17,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AddPinModal from "../components/AddPinModal";
+import { ArchivedChatSummaryRow } from "../components/ArchivedChatSummaryRow";
 import { ChatListItem } from "../components/ChatListItem";
 import { EmptyChatsState } from "../components/EmptyChatsState";
 import { NewChatFab } from "../components/NewChatFab";
 import { getLineHeight } from "@/src/helpers/lineHeight";
+import { useArchivedConversations } from "../api/useArchivedConversations";
 import { useChats } from "../api/useChats";
 import { useVisiblePresence } from "../hooks/useVisiblePresence";
 import { Chat } from "../types";
@@ -36,33 +38,21 @@ const ChatsScreen = () => {
   const router = useRouter();
 
   const { data: conversations, isLoading, isError, refetch } = useChats();
-  const [chats, setChats] = useState<Chat[]>([]);
-
-  useEffect(() => {
-    if (!conversations) return;
-    setChats((prev) =>
-      conversations.map((chat) => {
-        const existing = prev.find((p) => p.id === chat.id);
-        return existing
-          ? {
-              ...chat,
-              muted: existing.muted,
-              pinned: existing.pinned,
-              archived: existing.archived,
-            }
-          : chat;
-      })
-    );
-  }, [conversations]);
+  const { data: archivedData } = useArchivedConversations();
 
   const visibleChats = useMemo(
     () =>
-      chats
+      (conversations ?? [])
         .filter((chat) => !chat.archived)
         .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned)),
-    [chats]
+    [conversations]
   );
-  const hasChats = visibleChats.length > 0;
+  const archivedChats = useMemo(
+    () => archivedData?.pages.flatMap((page) => page.items) ?? [],
+    [archivedData]
+  );
+  const hasArchivedChats = archivedChats.length > 0;
+  const hasChats = visibleChats.length > 0 || hasArchivedChats;
 
   const { onlineByConversationId, updateVisible } = useVisiblePresence();
   const visibleChatsRef = useRef(visibleChats);
@@ -106,30 +96,6 @@ const ChatsScreen = () => {
       setShowPinModal(true);
     }
   }, [hasPin]);
-
-  const toggleMute = (id: string) =>
-    setChats((prev) =>
-      prev.map((chat) =>
-        chat.id === id ? { ...chat, muted: !chat.muted } : chat
-      )
-    );
-
-  const togglePinned = (id: string) =>
-    setChats((prev) =>
-      prev.map((chat) =>
-        chat.id === id ? { ...chat, pinned: !chat.pinned } : chat
-      )
-    );
-
-  const toggleArchived = (id: string) =>
-    setChats((prev) =>
-      prev.map((chat) =>
-        chat.id === id ? { ...chat, archived: !chat.archived } : chat
-      )
-    );
-
-  const deleteChat = (id: string) =>
-    setChats((prev) => prev.filter((chat) => chat.id !== id));
 
   useFocusEffect(
     useCallback(() => {
@@ -195,6 +161,14 @@ const ChatsScreen = () => {
           keyExtractor={(item: Chat) => item.id}
           viewabilityConfig={VIEWABILITY_CONFIG}
           onViewableItemsChanged={onViewableItemsChanged}
+          ListHeaderComponent={
+            hasArchivedChats ? (
+              <ArchivedChatSummaryRow
+                chats={archivedChats}
+                onPress={() => router.push("/archived-chat")}
+              />
+            ) : null
+          }
           renderItem={({ item }) => (
             <ChatListItem
               chat={item}
@@ -209,10 +183,6 @@ const ChatsScreen = () => {
                   },
                 })
               }
-              onToggleMute={() => toggleMute(item.id)}
-              onTogglePinned={() => togglePinned(item.id)}
-              onDelete={() => deleteChat(item.id)}
-              onToggleArchived={() => toggleArchived(item.id)}
             />
           )}
           contentContainerStyle={styles.listContent}

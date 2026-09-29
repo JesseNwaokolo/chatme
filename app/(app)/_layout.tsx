@@ -3,8 +3,14 @@ import { connectSocket, disconnectSocket, getSocket } from "@/src/api/socket/soc
 import { getAuthStatus } from "@/src/feature/auth/utils/getAuthStatus";
 import { markDelivered } from "@/src/feature/chats/api/messagesApi";
 import { chatKeys } from "@/src/feature/chats/api/queryKeys";
+import { Chat } from "@/src/feature/chats/types";
 import { applyUnreadCount } from "@/src/feature/chats/utils/applyUnreadCount";
+import { InAppNotificationBanner } from "@/src/shared/components/InAppNotificationBanner";
+import { playNotificationSound } from "@/src/shared/utils/notificationSound";
+import useActiveConversationStore from "@/src/store/useActiveConversationStore";
 import useAuthStore from "@/src/store/useAuthStore";
+import useMutedChatsStore from "@/src/store/useMutedChatsStore";
+import useNotificationBannerStore from "@/src/store/useNotificationBannerStore";
 import useSocketStore from "@/src/store/useSocketStore";
 import useUserStore from "@/src/store/useUserStore";
 import { useQueryClient } from "@tanstack/react-query";
@@ -46,6 +52,27 @@ const AppLayout = () => {
       markDelivered(payload.conversationId, payload.id)
         .then((data) => applyUnreadCount(queryClient, data.conversationId, data.unreadCount))
         .catch(() => {});
+
+      const activeConversationId = useActiveConversationStore.getState().activeConversationId;
+      if (activeConversationId === payload.conversationId) return;
+      if (AppState.currentState !== "active") return;
+
+      const chats = queryClient.getQueryData<Chat[]>(chatKeys.list());
+      const chat = chats?.find((c) => c.id === payload.conversationId);
+      if (!chat) return;
+      if (useMutedChatsStore.getState().isMuted(chat.id)) return;
+
+      playNotificationSound();
+
+      useNotificationBannerStore.getState().show({
+        id: payload.id,
+        conversationId: payload.conversationId,
+        participantId: chat.participantId,
+        name: chat.name,
+        avatarUrl: chat.avatarUrl,
+        isGroup: chat.isGroup,
+        text: payload.text,
+      });
     };
 
     socket.on("message.created", handleMessageCreated);
@@ -61,7 +88,12 @@ const AppLayout = () => {
     return <Redirect href="/(auth)" />;
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <>
+      <Stack screenOptions={{ headerShown: false }} />
+      <InAppNotificationBanner />
+    </>
+  );
 };
 
 export default AppLayout;

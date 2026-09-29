@@ -26,10 +26,12 @@ export interface ConversationSettings {
   clearedThroughMessageId: string | null;
 }
 
-export interface ConversationResponse {
+export interface GroupParticipant extends ConversationParticipant {
+  role: "owner" | "member";
+}
+
+interface ConversationResponseBase {
   id: string;
-  type: "direct";
-  otherParticipant: ConversationParticipant;
   latestMessage: ConversationLatestMessage | null;
   unreadCount: number;
   settings?: ConversationSettings;
@@ -37,6 +39,20 @@ export interface ConversationResponse {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface DirectConversationResponse extends ConversationResponseBase {
+  type: "direct";
+  otherParticipant: ConversationParticipant;
+}
+
+export interface GroupConversationResponse extends ConversationResponseBase {
+  type: "group";
+  name: string;
+  avatarUrl: string | null;
+  participants: GroupParticipant[];
+}
+
+export type ConversationResponse = DirectConversationResponse | GroupConversationResponse;
 
 export interface ConversationListResponse {
   items: ConversationResponse[];

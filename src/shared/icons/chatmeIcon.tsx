@@ -7,7 +7,6 @@ function ChatMeIcon() {
       height="40"
       viewBox="0 0 40 40"
       fill="none"
-      // xmlns="http://www.w3.org/2000/svg"
     >
       <Path
         d="M25 23.3334C25 23.3334 23.4375 24.8438 20 24.8438C16.5625 24.8438 15 23.3334 15 23.3334"

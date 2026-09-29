@@ -24,7 +24,6 @@ const AddPhoneNumber = () => {
       { phoneNumber: phone },
       {
         onSuccess: (data) => {
-        // 1234 is a hardcoded placeholder until real codes are sent.
           Toast.show({
             type: "success",
             text1: `Code sent to ${data.phoneNumberMasked}`,
@@ -60,7 +59,6 @@ const AddPhoneNumber = () => {
     >
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={24}>
         <View style={styles.view}>
-          {/* texts */}
           <View style={{ gap: 12 }}>
             <StyledText weight="bold" size={24} style={styles.title}>
               What&apos;s your phone number?
@@ -69,7 +67,6 @@ const AddPhoneNumber = () => {
               We will send you the verification code.
             </StyledText>
           </View>
-          {/* phone number input */}
           <View>
             <PhoneNumber phone={phone} setPhone={setPhone} />
           </View>

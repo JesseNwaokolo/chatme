@@ -29,13 +29,23 @@ export const NewChatFab = () => {
     router.push("/contact");
   };
 
+  const handleNewContact = () => {
+    closeMenu();
+    router.push("/new-contact");
+  };
+
   const iconAnimStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],
   }));
 
   return (
     <>
-      <NewChatMenu visible={menuOpen} onDismiss={closeMenu} onSelectNewChat={handleNewChat} />
+      <NewChatMenu
+        visible={menuOpen}
+        onDismiss={closeMenu}
+        onSelectNewChat={handleNewChat}
+        onSelectNewContact={handleNewContact}
+      />
       <Pressable style={styles.fab} onPress={toggleMenu}>
         <Animated.View style={iconAnimStyle}>
           <PlusIcon color={accentColor} />

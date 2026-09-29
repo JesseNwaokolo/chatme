@@ -55,7 +55,7 @@
         "expo-image-picker",
         {
           "photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can upload a profile picture.",
-          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera so you can take a profile picture.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to take photos and set up Face ID.",
           "microphonePermission": false
         }
       ],
@@ -66,12 +66,19 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to take photos and set up Face ID."
+        }
+      ],
+      [
         "expo-contacts",
         {
           "contactsPermission": "Allow $(PRODUCT_NAME) to access your contacts to find friends already on ChatMe."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,4 +1,3 @@
-// TEMP: dev-only verification screen for the Socket.IO integration
 import {
   startTyping,
   stopTyping,

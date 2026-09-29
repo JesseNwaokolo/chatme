@@ -187,7 +187,6 @@ const PhotoPickerSheet = ({
                       style={styles.thumb}
                       contentFit="cover"
                     />
-                    {/* camera-icon-overlay */}
                     {index === 0 && (
                       <View style={styles.cameraOverlay}>
                         <CameraIcon size={32} color={theme.bgNeutral} />
@@ -195,7 +194,6 @@ const PhotoPickerSheet = ({
                     )}
                   </Pressable>
                 )
-                // )
               }
             />
           )}
@@ -235,7 +233,6 @@ const makeStyles = (theme: Theme) => {
       backgroundColor: theme.bgNeutral,
       borderRadius: 16,
       paddingVertical: 8,
-      //to-do add shadow
     },
     stripRow: {
       height: 64,

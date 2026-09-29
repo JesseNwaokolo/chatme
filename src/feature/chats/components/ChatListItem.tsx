@@ -15,6 +15,10 @@ import Swipeable, {
   SwipeableMethods,
   SwipeDirection,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
+import Toast from "react-native-toast-message";
+import { useArchiveConversation, useUnarchiveConversation } from "../api/useArchiveConversation";
+import { usePinConversation, useUnpinConversation } from "../api/usePinConversation";
+import useMutedChatsStore from "@/src/store/useMutedChatsStore";
 import { Chat } from "../types";
 import { Avatar } from "@/src/shared/components/Avatar";
 import { SwipeActionButton } from "./SwipeActionButton";
@@ -22,53 +26,56 @@ import { SwipeActionButton } from "./SwipeActionButton";
 interface ChatListItemProps {
   chat: Chat;
   onPress?: () => void;
-  onToggleMute?: () => void;
-  onTogglePinned?: () => void;
-  onDelete?: () => void;
-  onToggleArchived?: () => void;
-  onMore?: () => void;
 }
 
-export const ChatListItem = ({
-  chat,
-  onPress,
-  onToggleMute,
-  onTogglePinned,
-  onDelete,
-  onToggleArchived,
-  onMore,
-}: ChatListItemProps) => {
+export const ChatListItem = ({ chat, onPress }: ChatListItemProps) => {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const { label, isToday } = formatChatTime(chat.timestamp);
   const swipeableRef = useRef<SwipeableMethods>(null);
+  const archiveMutation = useArchiveConversation();
+  const unarchiveMutation = useUnarchiveConversation();
+  const pinMutation = usePinConversation();
+  const unpinMutation = useUnpinConversation();
+  const isMuted = useMutedChatsStore((s) => s.mutedConversationIds.includes(chat.id));
+  const muteChat = useMutedChatsStore((s) => s.mute);
+  const unmuteChat = useMutedChatsStore((s) => s.unmute);
+
   const [openDirection, setOpenDirection] = useState<SwipeDirection | null>(null);
 
   const renderLeftActions = () => (
     <View
       style={styles.actionsRow}
-      // Swipeable reports the direction the row itself moved, not which
-      // panel is showing — revealing the left actions moves the row right.
-      pointerEvents={openDirection === SwipeDirection.RIGHT ? "auto" : "none"}
+      // pointerEvents={openDirection === SwipeDirection.RIGHT ? "auto" : "none"}
     >
       <SwipeActionButton
-        label="Mute"
+        label={isMuted ? "Unmute" : "Mute"}
         icon={<MuteIcon color={theme.buttonPrimaryText} />}
         backgroundColor={theme.warning}
         onPress={() => {
           swipeableRef.current?.close();
-          Alert.alert("Mute");
-          onToggleMute?.();
+          if (isMuted) {
+            unmuteChat(chat.id);
+          } else {
+            muteChat(chat.id);
+          }
         }}
       />
       <SwipeActionButton
-        label="Pinned"
+        label={chat.pinned ? "Unpin" : "Pin"}
         icon={<PinIcon color={theme.buttonPrimaryText} />}
         backgroundColor={theme.neutralAction}
         onPress={() => {
           swipeableRef.current?.close();
-          Alert.alert("Pinned");
-          onTogglePinned?.();
+          if (chat.pinned) {
+            unpinMutation.mutate(chat.id, {
+              onError: () => Toast.show({ type: "error", text1: "Couldn't unpin chat" }),
+            });
+          } else {
+            pinMutation.mutate(chat.id, {
+              onError: () => Toast.show({ type: "error", text1: "Couldn't pin chat" }),
+            });
+          }
         }}
       />
     </View>
@@ -77,36 +84,47 @@ export const ChatListItem = ({
   const renderRightActions = () => (
     <View
       style={styles.actionsRow}
-      // Same inversion as above — revealing the right actions moves the
-      // row left.
-      pointerEvents={openDirection === SwipeDirection.LEFT ? "auto" : "none"}
+      // pointerEvents={openDirection === SwipeDirection.LEFT ? "auto" : "none"}
     >
       <SwipeActionButton
         label="Delete"
         icon={<DeleteIcon color={theme.buttonPrimaryText} />}
         backgroundColor={theme.danger}
+        onPressIn={() => console.log("[ChatListItem] Delete onPressIn")}
         onPress={() => {
-          Alert.alert("Delete");
-          onDelete?.();
+          console.log("[ChatListItem] Delete onPress");
+          Alert.alert("Delete", undefined, [
+            { text: "OK", onPress: () => swipeableRef.current?.close() },
+          ]);
         }}
       />
       <SwipeActionButton
-        label="Archived"
+        label={chat.archived ? "Unarchive" : "Archived"}
         icon={<ArchiveIcon color={theme.buttonPrimaryText} />}
         backgroundColor={theme.neutralAction}
         onPress={() => {
           swipeableRef.current?.close();
-          Alert.alert("Archived");
-          onToggleArchived?.();
+          if (chat.archived) {
+            unarchiveMutation.mutate(chat.id, {
+              onError: () => Toast.show({ type: "error", text1: "Couldn't unarchive chat" }),
+            });
+          } else {
+            archiveMutation.mutate(chat.id, {
+              onError: () => Toast.show({ type: "error", text1: "Couldn't archive chat" }),
+            });
+          }
         }}
       />
       <SwipeActionButton
         label="More"
         icon={<MoreIcon color={theme.buttonPrimaryText} />}
         backgroundColor={theme.neutralActionLight}
+        onPressIn={() => console.log("[ChatListItem] More onPressIn")}
         onPress={() => {
-          swipeableRef.current?.close();
-          onMore?.();
+          console.log("[ChatListItem] More onPress");
+          Alert.alert("More", undefined, [
+            { text: "OK", onPress: () => swipeableRef.current?.close() },
+          ]);
         }}
       />
     </View>
@@ -120,8 +138,8 @@ export const ChatListItem = ({
       friction={2}
       overshootLeft={false}
       overshootRight={false}
-      onSwipeableWillOpen={setOpenDirection}
-      onSwipeableWillClose={() => setOpenDirection(null)}
+      // onSwipeableWillOpen={setOpenDirection}
+      // onSwipeableWillClose={() => setOpenDirection(null)}
     >
       <Pressable style={styles.row} onPress={onPress}>
         <Avatar
@@ -135,8 +153,7 @@ export const ChatListItem = ({
             <StyledText weight="bold" numberOfLines={1} style={styles.name}>
               {chat.name}
             </StyledText>
-            {chat.pinned && <PinIcon color={theme.textSecondary} />}
-            {chat.muted && <MuteIcon color={theme.textSecondary} />}
+            {isMuted && <MuteIcon color={theme.textSecondary} />}
           </View>
           <StyledText
             numberOfLines={1}
@@ -156,12 +173,16 @@ export const ChatListItem = ({
           >
             {label}
           </StyledText>
-          {!!chat.unreadCount && (
-            <View style={styles.badge}>
-              <StyledText size={14} weight="bold" style={styles.badgeText}>
-                {chat.unreadCount}
-              </StyledText>
-            </View>
+          {chat.pinned ? (
+            <PinIcon color={theme.textSecondary} />
+          ) : (
+            !!chat.unreadCount && (
+              <View style={styles.badge}>
+                <StyledText size={14} weight="bold" style={styles.badgeText}>
+                  {chat.unreadCount}
+                </StyledText>
+              </View>
+            )
           )}
         </View>
       </Pressable>

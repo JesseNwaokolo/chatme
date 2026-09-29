@@ -1,10 +1,12 @@
 import { queryClient } from "@/src/api/queryClient";
+import { queryPersister } from "@/src/api/queryPersister";
+import { chatKeys } from "@/src/feature/chats/api/queryKeys";
 import { toastConfig } from "@/src/shared/components/toastConfig";
 import useAuthStore from "@/src/store/useAuthStore";
 import { darkTheme } from "@/src/theme/colors";
 import { fontAssets } from "@/src/theme/fonts";
 import useThemeStore from "@/src/theme/useThemeStore";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -35,7 +37,17 @@ export default function RootLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister: queryPersister,
+        maxAge: 24 * 60 * 60 * 1000,
+        dehydrateOptions: {
+          shouldDehydrateQuery: (query) =>
+            query.queryKey[0] === chatKeys.all[0] && query.queryKey[1] === "list",
+        },
+      }}
+    >
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <KeyboardProvider>
@@ -45,6 +57,6 @@ export default function RootLayout() {
           </KeyboardProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }

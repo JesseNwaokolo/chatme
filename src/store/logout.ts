@@ -9,7 +9,6 @@ export async function logout() {
     try {
       await logoutRequest({ refreshToken });
     } catch {
-      // still clear the local session even if the server call fails
     }
   }
 
