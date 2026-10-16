@@ -42,10 +42,52 @@ const MIME_TYPES: Record<string, string> = {
   mov: "video/quicktime",
   m4a: "audio/mp4",
   pdf: "application/pdf",
+  txt: "text/plain",
+  webm: "video/webm",
+  mp3: "audio/mpeg",
+  aac: "audio/aac",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 };
 
-export const getMimeType = (uri: string) =>
-  MIME_TYPES[uri.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
+const ALLOWED_CONTENT_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "audio/aac",
+  "audio/mp4",
+  "audio/m4a",
+  "audio/x-m4a",
+  "audio/mpeg",
+  "audio/ogg",
+  "audio/wav",
+  "audio/x-wav",
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+  "application/pdf",
+  "text/plain",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+]);
+
+export const getMimeType = (uriOrName: string) =>
+  MIME_TYPES[uriOrName.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
+
+export function resolveContentType(uriOrName: string, reported?: string | null) {
+  const candidates = [reported === "image/jpg" ? "image/jpeg" : reported, getMimeType(uriOrName)];
+  const match = candidates.find((type): type is string => !!type && ALLOWED_CONTENT_TYPES.has(type));
+  if (match) return match;
+
+  const extension = uriOrName.split(".").pop()?.toLowerCase();
+  throw new Error(
+    `${extension ? `.${extension} files` : "This file type"} can't be sent. Supported: photos, videos, audio, PDF, TXT, DOCX, XLSX, PPTX.`,
+  );
+}
 
 const createUpload = (body: {
   clientUploadId: string;
@@ -59,10 +101,6 @@ const createUpload = (body: {
 const completeUpload = (mediaId: string) =>
   apiClient.post<Media>(endpoints.media.completeUpload(mediaId)).then((res) => res.data);
 
-/**
- * Full signed-upload flow: register the upload with our API, send the file to the
- * returned (Cloudinary) URL with the signed fields, then confirm completion.
- */
 export async function uploadMedia(params: {
   uri: string;
   purpose: MediaPurpose;
@@ -70,7 +108,7 @@ export async function uploadMedia(params: {
   filename?: string;
   sizeBytes?: number;
 }): Promise<Media> {
-  const contentType = params.contentType ?? getMimeType(params.uri);
+  const contentType = resolveContentType(params.filename ?? params.uri, params.contentType);
   const extension = params.uri.split(".").pop()?.toLowerCase() ?? "jpg";
   const originalFilename = params.filename ?? `${params.purpose}-${Date.now()}.${extension}`;
 

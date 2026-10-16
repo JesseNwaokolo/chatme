@@ -67,6 +67,18 @@ export interface MessageListResponse {
   };
 }
 
+export interface ReceiptFrontier {
+  userId: string;
+  version: number;
+  delivered: ReceiptBoundary | null;
+  read: ReceiptBoundary | null;
+}
+
+export interface ReceiptFrontiersResponse {
+  conversationId: string;
+  items: ReceiptFrontier[];
+}
+
 export interface ReceiptActionResponse {
   conversationId: string;
   status: "delivered" | "read";

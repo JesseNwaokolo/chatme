@@ -14,29 +14,38 @@ interface MessageBubbleProps {
   message: ChatMessage;
   receiptStatus?: "sent" | "delivered" | "read";
   onLongPress?: (message: ChatMessage) => void;
+  onPress?: (message: ChatMessage) => void;
+  onImagePress?: (message: ChatMessage, attachment: ChatAttachment) => void;
 }
 
 const AttachmentView = ({
   attachment,
   textColor,
+  onPress,
+  onLongPress,
 }: {
   attachment: ChatAttachment;
   textColor: string;
+  onPress?: () => void;
+  onLongPress?: () => void;
 }) => {
   if (attachment.type === "image") {
     const ratio =
       attachment.width && attachment.height ? attachment.width / attachment.height : 1;
     return (
-      <Image
-        source={{ uri: attachment.url }}
-        style={{
-          width: IMAGE_SIZE,
-          height: IMAGE_SIZE / Math.min(Math.max(ratio, 0.6), 1.6),
-          borderRadius: 12,
-          marginBottom: 6,
-        }}
-        contentFit="cover"
-      />
+      <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={250}>
+        <Image
+          source={{ uri: attachment.url }}
+          style={{
+            width: IMAGE_SIZE,
+            height: IMAGE_SIZE / Math.min(Math.max(ratio, 0.6), 1.6),
+            borderRadius: 12,
+            marginBottom: 6,
+          }}
+          contentFit="cover"
+          transition={150}
+        />
+      </Pressable>
     );
   }
 
@@ -58,7 +67,13 @@ const AttachmentView = ({
   );
 };
 
-export const MessageBubble = ({ message, receiptStatus, onLongPress }: MessageBubbleProps) => {
+export const MessageBubble = ({
+  message,
+  receiptStatus,
+  onLongPress,
+  onPress,
+  onImagePress,
+}: MessageBubbleProps) => {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const time = message.timestamp.toLocaleTimeString(undefined, {
@@ -92,6 +107,7 @@ export const MessageBubble = ({ message, receiptStatus, onLongPress }: MessageBu
         </View>
       )}
       <Pressable
+        onPress={() => onPress?.(message)}
         onLongPress={() => onLongPress?.(message)}
         delayLongPress={250}
         disabled={message.status === "sending" || message.deleted}
@@ -111,8 +127,15 @@ export const MessageBubble = ({ message, receiptStatus, onLongPress }: MessageBu
             key={`${attachment.url}-${index}`}
             attachment={attachment}
             textColor={textColor}
+            onPress={() => onImagePress?.(message, attachment)}
+            onLongPress={() => onLongPress?.(message)}
           />
         ))}
+        {message.status === "failed" && (
+          <StyledText size={12} weight="medium" style={{ color: theme.danger }}>
+            Not sent · tap to retry
+          </StyledText>
+        )}
         {!message.deleted && !!message.text &&
           (mapsUrl ? (
             <Pressable onPress={() => Linking.openURL(mapsUrl)}>

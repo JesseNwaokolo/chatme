@@ -3,5 +3,6 @@ export const chatKeys = {
   list: () => [...chatKeys.all, "list"] as const,
   detail: (id: string) => [...chatKeys.all, "detail", id] as const,
   messages: (conversationId: string) => [...chatKeys.all, "messages", conversationId] as const,
+  receipts: (conversationId: string) => [...chatKeys.all, "receipts", conversationId] as const,
   archived: () => [...chatKeys.all, "archived"] as const,
 };

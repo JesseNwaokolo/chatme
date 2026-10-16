@@ -6,6 +6,7 @@ import {
   MessageListResponse,
   MessageResponse,
   ReceiptActionResponse,
+  ReceiptFrontiersResponse,
   SendMessageRequest,
 } from "./types";
 
@@ -85,5 +86,5 @@ export const markAllRead = (conversationId: string) =>
 
 export const getReceipts = (conversationId: string) =>
   apiClient
-    .get<unknown>(endpoints.conversations.receipts(conversationId))
+    .get<ReceiptFrontiersResponse>(endpoints.conversations.receipts(conversationId))
     .then((res) => res.data);

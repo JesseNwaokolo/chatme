@@ -1,5 +1,6 @@
 import { logoutRequest } from "../feature/auth/api/authApi";
 import { unregisterFromPushNotifications } from "../shared/notifications/pushNotifications";
+import { clearPersistedCache } from "../api/queryPersister";
 import useAuthStore from "./useAuthStore";
 import useUserStore from "./useUserStore";
 
@@ -17,4 +18,5 @@ export async function logout() {
 
   useAuthStore.getState().clearTokens();
   useUserStore.getState().clearUser();
+  clearPersistedCache();
 }

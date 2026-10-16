@@ -6,6 +6,7 @@ import {
   BlockIcon,
   CameraIcon,
   ChatIcon,
+  EditIcon,
   ChevronLeftIcon,
   GalleryIcon,
   LinkIcon,
@@ -19,7 +20,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { setStatusBarStyle } from "expo-status-bar";
 import { useCallback, useRef, useState } from "react";
 import { AddMembersSheet, AddMembersSheetRef } from "../components/AddMembersSheet";
-import { useBlockUser } from "@/src/feature/blocks/api/useBlocks";
+import { useBlockUser, useIsBlocked, useUnblockUser } from "@/src/feature/blocks/api/useBlocks";
 import {
   ActivityIndicator,
   Alert,
@@ -91,6 +92,8 @@ const ChatProfileScreen = () => {
   const clearChat = useClearConversation(id);
   const deleteDirect = useDeleteDirectChat(id);
   const blockUser = useBlockUser();
+  const unblockUser = useUnblockUser();
+  const isBlocked = useIsBlocked(data?.type === "direct" ? data.otherParticipant.id : null);
   const leaveGroup = useLeaveGroup(id);
   const deleteGroup = useDeleteGroup(id);
   const renameGroup = useRenameGroup(id);
@@ -99,13 +102,17 @@ const ChatProfileScreen = () => {
   const transferOwnership = useTransferGroupOwnership(id);
   const removeGroupAvatar = useRemoveGroupAvatar(id);
   const addMembersRef = useRef<AddMembersSheetRef>(null);
+  const [memberMenu, setMemberMenu] = useState<{
+    title: string;
+    actions: { text: string; destructive?: boolean; onPress: () => void }[];
+  } | null>(null);
   const [renameVisible, setRenameVisible] = useState(false);
   const [renameValue, setRenameValue] = useState("");
 
   const groupData =
     data && data.type === "group" ? (data as GroupConversationResponse) : undefined;
   const myRole = groupData?.role ?? groupData?.participants.find((p) => p.id === myUserId)?.role;
-  const canManage = myRole === "owner" || myRole === "admin";
+  const canManage = !myRole || myRole === "owner" || myRole === "admin";
 
   const fail = (title: string) => (error: unknown) =>
     Toast.show({
@@ -124,9 +131,19 @@ const ChatProfileScreen = () => {
 
   const handleBlock = () => {
     if (data?.type !== "direct") return;
+    const userId = data.otherParticipant.id;
+
+    if (isBlocked) {
+      unblockUser.mutate(userId, {
+        onSuccess: () => Toast.show({ type: "success", text1: `${name} unblocked` }),
+        onError: fail("Couldn't unblock contact"),
+      });
+      return;
+    }
+
     confirm("Block contact", `Block ${name}? They won't be able to message you.`, "Block", () =>
-      blockUser.mutate(data.otherParticipant.id, {
-        onSuccess: goToChats,
+      blockUser.mutate(userId, {
+        onSuccess: () => Toast.show({ type: "success", text1: `${name} blocked` }),
         onError: fail("Couldn't block contact"),
       }),
     );
@@ -180,7 +197,7 @@ const ChatProfileScreen = () => {
   const handleMemberPress = (member: GroupParticipant) => {
     if (member.id === myUserId || !canManage || member.role === "owner") return;
     const memberName = member.displayName ?? "this member";
-    const buttons: { text: string; style?: "cancel" | "destructive"; onPress?: () => void }[] = [];
+    const buttons: { text: string; destructive?: boolean; onPress: () => void }[] = [];
 
     if (myRole === "owner") {
       buttons.push({
@@ -202,13 +219,13 @@ const ChatProfileScreen = () => {
     if (myRole === "owner" || member.role === "member") {
       buttons.push({
         text: "Remove from group",
-        style: "destructive",
+        destructive: true,
         onPress: () =>
           removeMember.mutate(member.id, { onError: fail("Couldn't remove member") }),
       });
     }
     if (buttons.length === 0) return;
-    Alert.alert(memberName, undefined, [...buttons, { text: "Cancel", style: "cancel" }]);
+    setMemberMenu({ title: memberName, actions: buttons });
   };
 
   useFocusEffect(
@@ -254,9 +271,25 @@ const ChatProfileScreen = () => {
         </View>
 
         <View style={styles.heroBottom}>
-          <StyledText weight="bold" size={26} style={{ color: "#FFFFFF" }} numberOfLines={1}>
-            {name}
-          </StyledText>
+          <Pressable
+            style={styles.heroNameRow}
+            disabled={!groupData || !canManage}
+            onPress={() => {
+              if (!groupData) return;
+              setRenameValue(groupData.name);
+              setRenameVisible(true);
+            }}
+          >
+            <StyledText
+              weight="bold"
+              size={26}
+              style={{ color: "#FFFFFF", flexShrink: 1 }}
+              numberOfLines={1}
+            >
+              {name}
+            </StyledText>
+            {groupData && canManage && <EditIcon size={20} color="#FFFFFF" />}
+          </Pressable>
           <StyledText size={14} style={{ color: "rgba(255,255,255,0.8)" }}>
             {MOCK_LAST_SEEN}
           </StyledText>
@@ -295,6 +328,48 @@ const ChatProfileScreen = () => {
           )}
         </Pressable>
       </View>
+
+      <Modal
+        visible={!!memberMenu}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setMemberMenu(null)}
+      >
+        <Pressable style={styles.menuBackdrop} onPress={() => setMemberMenu(null)}>
+          <Pressable
+            style={[styles.menuSheet, { paddingBottom: insets.bottom + 12 }]}
+            onPress={() => {}}
+          >
+            <StyledText weight="bold" size={16} style={styles.menuTitle} numberOfLines={1}>
+              {memberMenu?.title}
+            </StyledText>
+            {memberMenu?.actions.map((action) => (
+              <Pressable
+                key={action.text}
+                style={styles.menuRow}
+                onPress={() => {
+                  setMemberMenu(null);
+                  action.onPress();
+                }}
+              >
+                <StyledText
+                  weight="medium"
+                  size={16}
+                  style={{ color: action.destructive ? theme.danger : theme.textPrimary }}
+                >
+                  {action.text}
+                </StyledText>
+              </Pressable>
+            ))}
+            <Pressable style={styles.menuRow} onPress={() => setMemberMenu(null)}>
+              <StyledText weight="bold" size={16} style={{ color: theme.textSecondary }}>
+                Cancel
+              </StyledText>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={renameVisible}
@@ -499,9 +574,13 @@ const ChatProfileScreen = () => {
               </StyledText>
             </Pressable>
             <Pressable style={styles.blockRow} onPress={handleBlock}>
-              <BlockIcon size={20} color={theme.danger} />
-              <StyledText weight="medium" size={16} style={{ color: theme.danger }}>
-                Block contact
+              <BlockIcon size={20} color={isBlocked ? theme.textPrimary : theme.danger} />
+              <StyledText
+                weight="medium"
+                size={16}
+                style={{ color: isBlocked ? theme.textPrimary : theme.danger }}
+              >
+                {isBlocked ? "Unblock contact" : "Block contact"}
               </StyledText>
             </Pressable>
           </>
@@ -552,6 +631,11 @@ const makeStyles = (theme: Theme) =>
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: "rgba(8, 28, 44, 0.5)",
+    },
+    heroNameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
     },
     heroBottom: {
       position: "absolute",
@@ -645,6 +729,28 @@ const makeStyles = (theme: Theme) =>
       flexDirection: "row",
       justifyContent: "flex-end",
       gap: 24,
+    },
+    menuBackdrop: {
+      flex: 1,
+      justifyContent: "flex-end",
+      backgroundColor: "rgba(0,0,0,0.45)",
+    },
+    menuSheet: {
+      backgroundColor: theme.bgPrimaryLighter,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingTop: 8,
+    },
+    menuTitle: {
+      color: theme.textPrimary,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+    },
+    menuRow: {
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.border,
     },
     blockRow: {
       flexDirection: "row",

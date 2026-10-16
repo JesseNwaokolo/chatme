@@ -27,6 +27,7 @@ export interface ConversationLatestMessage {
 }
 
 export interface ConversationSettings {
+  deletedAt?: string | null;
   archived: boolean;
   muted: boolean;
   pinned: boolean;
@@ -72,7 +73,7 @@ export type ConversationResponse = DirectConversationResponse | GroupConversatio
 export interface ConversationListResponse {
   items: ConversationResponse[];
   pageInfo: {
-    nextCursor: string | null;
+    nextCursor: string | Record<string, unknown> | null;
     hasNextPage: boolean;
   };
 }

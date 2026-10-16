@@ -25,7 +25,14 @@ const BlockedContactScreen = () => {
         text: "Unblock",
         onPress: () =>
           unblock.mutate(userId, {
-            onError: () => Toast.show({ type: "error", text1: "Couldn't unblock contact" }),
+            onError: (error) => {
+              console.log("[blocks] unblock failed:", error);
+              Toast.show({
+                type: "error",
+                text1: "Couldn't unblock contact",
+                text2: error instanceof Error ? error.message : undefined,
+              });
+            },
           }),
       },
     ]);

@@ -1,5 +1,4 @@
 import { startTyping, stopTyping } from "@/src/api/socket/commands";
-import { MessageCreatedEvent } from "@/src/api/socket/types";
 import { Avatar } from "@/src/shared/components/Avatar";
 import { StyledText } from "@/src/shared/components/StyledText";
 import {
@@ -23,7 +22,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as Location from "expo-location";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { setStatusBarStyle } from "expo-status-bar";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -36,19 +35,28 @@ import {
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
-import { getMimeType, uploadMedia } from "@/src/shared/media/mediaApi";
+import { getMimeType, resolveContentType, uploadMedia } from "@/src/shared/media/mediaApi";
+import { ApiError } from "@/src/api/errors";
+import { useIsBlocked, useUnblockUser } from "@/src/feature/blocks/api/useBlocks";
+import { getConversation } from "../api/chatsApi";
 import { markRead } from "../api/messagesApi";
+import { chatKeys } from "../api/queryKeys";
+import { MessageResponse } from "../api/types";
+import { useConversation } from "../api/useConversation";
 import { useMessages } from "../api/useMessages";
+import { useReceipts } from "../api/useReceipts";
 import { useDeleteMessage, useEditMessage, useReactToMessage } from "../api/useMessageActions";
 import { useSendMessage } from "../api/useSendMessage";
 import { AttachmentPickerSheet } from "../components/AttachmentPickerSheet";
 import { MessageActionsModal } from "../components/MessageActionsModal";
+import { ImageViewerModal } from "../components/ImageViewerModal";
 import { MessageBubble } from "../components/MessageBubble";
 import VirtualizedListScrollView from "../components/VirtualizedListScrollView";
 import { useConversationSocket } from "../hooks/useConversationSocket";
-import { ChatMessage, PickedMedia } from "../types";
+import { Chat, ChatAttachment, ChatMessage, PickedMedia } from "../types";
 import { applyUnreadCount } from "../utils/applyUnreadCount";
-import { getReceiptStatus, toChatMessage, upsertMessages } from "../utils/messages";
+import { patchMessageInCache, upsertMessageInCache } from "../utils/messageCache";
+import { buildMessages, computeReceiptThresholds, getReceiptStatus } from "../utils/messages";
 
 interface LocalAttachment {
   type: "image" | "video" | "audio" | "document";
@@ -58,8 +66,13 @@ interface LocalAttachment {
   sizeBytes?: number;
 }
 
+interface OutboxItem {
+  text?: string;
+  attachments?: LocalAttachment[];
+  mediaIds?: string[];
+}
+
 const TYPING_PAUSE_MS = 3000;
-const COMPOSER_FALLBACK_HEIGHT = 72;
 
 const ConversationScreen = () => {
   const { theme } = useTheme();
@@ -76,11 +89,15 @@ const ConversationScreen = () => {
 
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const lastMessageIdRef = useRef<string | null>(null);
+  const isAtEndRef = useRef(true);
+  const markedReadRef = useRef<string | null>(null);
+  const outboxRef = useRef(new Map<string, OutboxItem>());
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const myUserId = useUserStore((s) => s.user?.id);
+  const [pending, setPending] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
-  const [composerHeight, setComposerHeight] = useState(COMPOSER_FALLBACK_HEIGHT);
   const [showAttachments, setShowAttachments] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const {
     data: historyData,
@@ -89,6 +106,13 @@ const ConversationScreen = () => {
     isFetchingNextPage,
     refetch: refetchMessages,
   } = useMessages(id);
+  const { data: receipts, refetch: refetchReceipts } = useReceipts(id);
+  const { data: conversation, error: conversationError } = useConversation(id);
+  const otherUserId =
+    conversation?.type === "direct" ? conversation.otherParticipant.id : participantId || null;
+  const isBlockedByMe = useIsBlocked(conversation?.type === "group" ? null : otherUserId);
+  const unblockUser = useUnblockUser();
+  const initialScrollRef = useRef(true);
   const sendMessageMutation = useSendMessage(id);
   const editMessageMutation = useEditMessage(id);
   const deleteMessageMutation = useDeleteMessage(id);
@@ -98,6 +122,54 @@ const ConversationScreen = () => {
   const isFocused = useIsFocused();
   const isSocketConnected = useSocketStore((s) => s.isConnected);
   const queryClient = useQueryClient();
+
+  const history = useMemo(
+    () => historyData?.pages.flatMap((page) => page.items) ?? [],
+    [historyData],
+  );
+  const messages = useMemo(
+    () => buildMessages(history, pending, myUserId),
+    [history, pending, myUserId],
+  );
+  const receiptThresholds = useMemo(
+    () => computeReceiptThresholds(receipts?.items, myUserId, messages),
+    [receipts, myUserId, messages],
+  );
+  const viewerImages = useMemo(
+    () =>
+      messages.flatMap((message) =>
+        message.deleted
+          ? []
+          : (message.attachments ?? [])
+              .filter((a) => a.type === "image")
+              .map((a, i) => ({
+                key: `${message.id}-${i}`,
+                url: a.url,
+                title: message.fromMe ? "You" : (name ?? "Unknown"),
+                subtitle: message.timestamp.toLocaleString(undefined, {
+                  day: "numeric",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }),
+              })),
+      ),
+    [messages, name],
+  );
+
+  const handleConversationGone = useCallback(() => {
+    queryClient.setQueryData<Chat[]>(chatKeys.list(), (old) => old?.filter((c) => c.id !== id));
+    queryClient.removeQueries({ queryKey: chatKeys.messages(id) });
+    queryClient.invalidateQueries({ queryKey: chatKeys.list() });
+    Toast.show({ type: "error", text1: "This conversation is no longer available" });
+    router.back();
+  }, [id, queryClient, router]);
+
+  useEffect(() => {
+    if (conversationError instanceof ApiError && conversationError.status === 404) {
+      handleConversationGone();
+    }
+  }, [conversationError, handleConversationGone]);
 
   const isTypingRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -116,31 +188,30 @@ const ConversationScreen = () => {
   useEffect(() => stopTypingNow, [stopTypingNow]);
 
   useEffect(() => {
-    if (!historyData) return;
-
-    const myUserId = useUserStore.getState().user?.id;
-    const fetchedMessages = historyData.pages
-      .flatMap((page) => page.items)
-      .map((item) => toChatMessage(item, myUserId));
-
-    setMessages((prev) => upsertMessages(prev, fetchedMessages));
-  }, [historyData]);
-
-  useEffect(() => {
     const last = messages[messages.length - 1];
     if (!last || last.id === lastMessageIdRef.current) return;
 
     const isFirstLoad = lastMessageIdRef.current === null;
     lastMessageIdRef.current = last.id;
     requestAnimationFrame(() => {
-      listRef.current?.scrollToOffset({ offset: 1e7, animated: !isFirstLoad });
+      listRef.current?.scrollToEnd({ animated: !isFirstLoad });
     });
   }, [messages]);
+
+  const hasMessages = messages.length > 0;
+  useEffect(() => {
+    if (!hasMessages) return;
+    const timer = setTimeout(() => {
+      initialScrollRef.current = false;
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [hasMessages]);
 
   useEffect(() => {
     if (!isFocused || !isSocketConnected) return;
     refetchMessages();
-  }, [isFocused, isSocketConnected, refetchMessages]);
+    refetchReceipts();
+  }, [isFocused, isSocketConnected, refetchMessages, refetchReceipts]);
 
   const handleDraftChange = (text: string) => {
     setDraft(text);
@@ -154,18 +225,80 @@ const ConversationScreen = () => {
     typingTimeoutRef.current = setTimeout(stopTypingNow, TYPING_PAUSE_MS);
   };
 
-  const handleMessageCreated = useCallback((payload: MessageCreatedEvent) => {
-    const myUserId = useUserStore.getState().user?.id;
-    setMessages((prev) => upsertMessages(prev, [toChatMessage(payload, myUserId)]));
-  }, []);
-
-  const { isOtherOnline, isOtherTyping, otherReceipt } = useConversationSocket({
+  const { isOtherOnline, isOtherTyping } = useConversationSocket({
     conversationId: id,
     participantId: participantId ?? "",
-    onMessageCreated: handleMessageCreated,
+    onMessageChanged: refetchMessages,
   });
 
-  const dispatchMessage = async ({
+  const updatePending = (clientMessageId: string, patch: Partial<ChatMessage> | null) =>
+    setPending((prev) =>
+      patch
+        ? prev.map((m) => (m.clientMessageId === clientMessageId ? { ...m, ...patch } : m))
+        : prev.filter((m) => m.clientMessageId !== clientMessageId),
+    );
+
+  const deliver = async (clientMessageId: string) => {
+    const item = outboxRef.current.get(clientMessageId);
+    if (!item) return;
+    updatePending(clientMessageId, { status: "sending" });
+
+    try {
+      if (!item.mediaIds && item.attachments?.length) {
+        item.mediaIds = await Promise.all(
+          item.attachments.map(async (a) => {
+            const media = await uploadMedia({
+              uri: a.uri,
+              purpose: "message_attachment",
+              contentType: a.contentType,
+              filename: a.filename,
+              sizeBytes: a.sizeBytes,
+            });
+            return media.id;
+          }),
+        );
+      }
+
+      const data = await sendMessageMutation.mutateAsync({
+        clientMessageId,
+        text: item.text || undefined,
+        attachmentMediaIds: item.mediaIds,
+      });
+      outboxRef.current.delete(clientMessageId);
+      upsertMessageInCache(queryClient, data);
+      updatePending(clientMessageId, null);
+      queryClient.invalidateQueries({ queryKey: chatKeys.list() });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        const stillExists = await getConversation(id).then(
+          () => true,
+          (err) => !(err instanceof ApiError && err.status === 404),
+        );
+        if (!stillExists) {
+          outboxRef.current.delete(clientMessageId);
+          updatePending(clientMessageId, null);
+          handleConversationGone();
+          return;
+        }
+        updatePending(clientMessageId, { status: "failed" });
+        Toast.show({
+          type: "error",
+          text1: "Can't message this contact",
+          text2: "One of you may have blocked the other.",
+        });
+        return;
+      }
+      console.log("[conversation] send failed:", error);
+      updatePending(clientMessageId, { status: "failed" });
+      Toast.show({
+        type: "error",
+        text1: "Couldn't send message",
+        text2: error instanceof Error ? error.message : "Please try again.",
+      });
+    }
+  };
+
+  const dispatchMessage = ({
     text,
     attachments,
   }: {
@@ -173,69 +306,75 @@ const ConversationScreen = () => {
     attachments?: LocalAttachment[];
   }) => {
     const clientMessageId = Crypto.randomUUID();
-    setMessages((prev) =>
-      upsertMessages(prev, [
-        {
-          id: clientMessageId,
-          clientMessageId,
-          text: text ?? "",
-          attachments: attachments?.map((a) => ({
-            type: a.type,
-            url: a.uri,
-            filename: a.filename,
-            contentType: a.contentType,
-          })),
-          fromMe: true,
-          timestamp: new Date(),
-          status: "sending",
-        },
-      ]),
-    );
-
-    try {
-      const attachmentMediaIds = attachments?.length
-        ? await Promise.all(
-            attachments.map(async (a) => {
-              const media = await uploadMedia({
-                uri: a.uri,
-                purpose: "message_attachment",
-                contentType: a.contentType,
-                filename: a.filename,
-                sizeBytes: a.sizeBytes,
-              });
-              return media.id;
-            }),
-          )
-        : undefined;
-
-      const data = await sendMessageMutation.mutateAsync({
+    outboxRef.current.set(clientMessageId, { text, attachments });
+    setPending((prev) => [
+      ...prev,
+      {
+        id: clientMessageId,
         clientMessageId,
-        text: text || undefined,
-        attachmentMediaIds,
-      });
-      const myUserId = useUserStore.getState().user?.id;
-      setMessages((prev) => upsertMessages(prev, [toChatMessage(data, myUserId)]));
-    } catch {
-      setMessages((prev) => prev.filter((m) => m.clientMessageId !== clientMessageId));
-      Toast.show({
-        type: "error",
-        text1: "Couldn't send message",
-        text2: "Please try again.",
-      });
-    }
+        text: text ?? "",
+        attachments: attachments?.map((a) => ({
+          type: a.type,
+          url: a.uri,
+          filename: a.filename,
+          contentType: a.contentType,
+        })),
+        fromMe: true,
+        timestamp: new Date(),
+        status: "sending",
+      },
+    ]);
+    isAtEndRef.current = true;
+    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+    deliver(clientMessageId);
   };
 
-  const applyServerMessage = (data: Parameters<typeof toChatMessage>[0]) => {
-    const myUserId = useUserStore.getState().user?.id;
-    setMessages((prev) => upsertMessages(prev, [toChatMessage(data, myUserId)]));
+  const handleFailedPress = (message: ChatMessage) => {
+    const clientMessageId = message.clientMessageId;
+    if (message.status !== "failed" || !clientMessageId) return;
+
+    Alert.alert("Message not sent", undefined, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          outboxRef.current.delete(clientMessageId);
+          updatePending(clientMessageId, null);
+        },
+      },
+      { text: "Retry", onPress: () => deliver(clientMessageId) },
+    ]);
   };
+
+  const applyServerMessage = (data: MessageResponse) => upsertMessageInCache(queryClient, data);
 
   const handleReact = (message: ChatMessage, emoji: string | null) => {
+    if (!myUserId) return;
+
+    const previousReactions = message.reactions ?? [];
+    const nextReactions = [
+      ...previousReactions.filter((r) => r.userId !== myUserId),
+      ...(emoji ? [{ userId: myUserId, emoji }] : []),
+    ];
+    const setReactions = (reactions: ChatMessage["reactions"]) =>
+      patchMessageInCache(queryClient, id, message.id, (m) => ({ ...m, reactions }));
+
+    setReactions(nextReactions);
     reactMutation.mutate(
       { messageId: message.id, emoji },
       {
-        onSuccess: applyServerMessage,
-        onError: () => Toast.show({ type: "error", text1: "Couldn't update reaction" }),
+        onSuccess: (data) => {
+          if (data.reactions) applyServerMessage(data);
+        },
+        onError: (error) => {
+          setReactions(previousReactions);
+          Toast.show({
+            type: "error",
+            text1: "Couldn't update reaction",
+            text2: error instanceof Error ? error.message : undefined,
+          });
+        },
       },
     );
   };
@@ -249,7 +388,12 @@ const ConversationScreen = () => {
         onPress: () =>
           deleteMessageMutation.mutate(message.id, {
             onSuccess: applyServerMessage,
-            onError: () => Toast.show({ type: "error", text1: "Couldn't delete message" }),
+            onError: (error) =>
+              Toast.show({
+                type: "error",
+                text1: "Couldn't delete message",
+                text2: error instanceof Error ? error.message : undefined,
+              }),
           }),
       },
     ]);
@@ -269,7 +413,6 @@ const ConversationScreen = () => {
     const text = draft.trim();
 
     if (editingMessage) {
-      // Attachment captions may be cleared (null); text-only messages need text.
       if (!text && !editingMessage.attachments?.length) return;
       editMessageMutation.mutate(
         {
@@ -282,11 +425,11 @@ const ConversationScreen = () => {
             applyServerMessage(data);
             cancelEdit();
           },
-          onError: () =>
+          onError: (error) =>
             Toast.show({
               type: "error",
               text1: "Couldn't edit message",
-              text2: "It may have changed. Please try again.",
+              text2: error instanceof Error ? error.message : "Please try again.",
             }),
         },
       );
@@ -298,6 +441,13 @@ const ConversationScreen = () => {
     setDraft("");
     stopTypingNow();
     dispatchMessage({ text });
+  };
+
+  const handleImagePress = (message: ChatMessage, attachment: ChatAttachment) => {
+    const index = viewerImages.findIndex(
+      (image) => image.url === attachment.url && image.key.startsWith(`${message.id}-`),
+    );
+    if (index !== -1) setViewerIndex(index);
   };
 
   const handleLoadOlder = () => {
@@ -340,12 +490,23 @@ const ConversationScreen = () => {
     if (result.canceled) return;
 
     const doc = result.assets[0];
+    let contentType: string;
+    try {
+      contentType = resolveContentType(doc.name, doc.mimeType);
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Unsupported file",
+        text2: error instanceof Error ? error.message : undefined,
+      });
+      return;
+    }
     dispatchMessage({
       attachments: [
         {
           type: "document",
           uri: doc.uri,
-          contentType: doc.mimeType ?? getMimeType(doc.name),
+          contentType,
           filename: doc.name,
           sizeBytes: doc.size,
         },
@@ -354,7 +515,17 @@ const ConversationScreen = () => {
   };
 
   const handlePickContact = async () => {
-    const contact = await Contacts.presentContactPickerAsync();
+    let contact: Contacts.ExistingContact | null = null;
+    try {
+      contact = await Contacts.presentContactPickerAsync();
+    } catch (error) {
+      console.log("[conversation] contact picker failed:", error);
+      Toast.show({
+        type: "error",
+        text1: "Couldn't open contacts",
+        text2: error instanceof Error ? error.message : undefined,
+      });
+    }
     setShowAttachments(false);
     if (!contact) return;
 
@@ -388,17 +559,24 @@ const ConversationScreen = () => {
     }
   };
 
+  const lastIncomingId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (!m.fromMe && !m.status) return m.id;
+    }
+    return null;
+  }, [messages]);
+
   useEffect(() => {
-    if (!isFocused) return;
+    if (!isFocused || !lastIncomingId || markedReadRef.current === lastIncomingId) return;
+    markedReadRef.current = lastIncomingId;
 
-    const confirmed = messages.filter((m) => m.status !== "sending" && m.status !== "failed");
-    const last = confirmed[confirmed.length - 1];
-    if (!last) return;
-
-    markRead(id, last.id)
+    markRead(id, lastIncomingId)
       .then((data) => applyUnreadCount(queryClient, data.conversationId, data.unreadCount))
-      .catch(() => {});
-  }, [isFocused, messages, id, queryClient]);
+      .catch(() => {
+        markedReadRef.current = null;
+      });
+  }, [isFocused, lastIncomingId, id, queryClient]);
 
   useEffect(() => {
     useActiveConversationStore.getState().setActiveConversationId(isFocused ? id : null);
@@ -459,15 +637,29 @@ const ConversationScreen = () => {
             message={item}
             receiptStatus={
               item.fromMe && item.status !== "sending" && item.status !== "failed"
-                ? getReceiptStatus(item, otherReceipt)
+                ? getReceiptStatus(item, receiptThresholds)
                 : undefined
             }
-            onLongPress={setActionMessage}
+            onLongPress={(m) => (m.status === "failed" ? handleFailedPress(m) : setActionMessage(m))}
+            onPress={handleFailedPress}
+            onImagePress={handleImagePress}
           />
         )}
         contentContainerStyle={styles.messagesContent}
+        onContentSizeChange={() => {
+          if (initialScrollRef.current || isAtEndRef.current) {
+            listRef.current?.scrollToEnd({ animated: false });
+          }
+        }}
         renderScrollComponent={(scrollProps) => (
-          <VirtualizedListScrollView {...scrollProps} offset={composerHeight} />
+          <VirtualizedListScrollView
+            {...scrollProps}
+            offset={insets.bottom}
+            keyboardLiftBehavior="always"
+            onEndVisible={(visible) => {
+              isAtEndRef.current = visible;
+            }}
+          />
         )}
         onStartReached={handleLoadOlder}
         onStartReachedThreshold={0.3}
@@ -499,9 +691,37 @@ const ConversationScreen = () => {
             </Pressable>
           </View>
         )}
+        {isBlockedByMe ? (
+          <View style={[styles.composer, styles.blockedBar, { paddingBottom: insets.bottom + 12 }]}>
+            <StyledText size={14} style={{ color: theme.textSecondary, flex: 1 }}>
+              You blocked this contact.
+            </StyledText>
+            <Pressable
+              hitSlop={8}
+              disabled={unblockUser.isPending}
+              onPress={() =>
+                otherUserId &&
+                unblockUser.mutate(otherUserId, {
+                  onError: (error) =>
+                    Toast.show({
+                      type: "error",
+                      text1: "Couldn't unblock contact",
+                      text2: error instanceof Error ? error.message : undefined,
+                    }),
+                })
+              }
+            >
+              <StyledText weight="bold" size={14} style={{ color: theme.buttonPrimary }}>
+                Unblock
+              </StyledText>
+            </Pressable>
+          </View>
+        ) : (
         <View
           style={[styles.composer, { paddingBottom: insets.bottom + 12 }]}
-          onLayout={(e) => setComposerHeight(e.nativeEvent.layout.height)}
+          onLayout={() => {
+            if (isAtEndRef.current) requestAnimationFrame(() => listRef.current?.scrollToEnd());
+          }}
         >
           <Pressable hitSlop={8} onPress={() => setShowAttachments((prev) => !prev)}>
             <PaperclipIcon size={22} color={theme.textSecondary} />
@@ -522,7 +742,14 @@ const ConversationScreen = () => {
             <SendIcon size={18} color={theme.buttonPrimaryText} />
           </Pressable>
         </View>
+        )}
       </KeyboardStickyView>
+
+      <ImageViewerModal
+        images={viewerImages}
+        startIndex={viewerIndex}
+        onClose={() => setViewerIndex(null)}
+      />
 
       <MessageActionsModal
         message={actionMessage}
@@ -575,6 +802,7 @@ const makeStyles = (theme: Theme) =>
     messagesContent: {
       paddingHorizontal: 16,
       paddingTop: 16,
+      paddingBottom: 8,
     },
     loadingOlder: {
       paddingVertical: 12,
@@ -594,6 +822,9 @@ const makeStyles = (theme: Theme) =>
       fontSize: 16,
       maxHeight: 120,
       paddingVertical: 8,
+    },
+    blockedBar: {
+      alignItems: "center",
     },
     sendButton: {
       width: 40,

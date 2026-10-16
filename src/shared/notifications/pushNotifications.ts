@@ -9,7 +9,6 @@ import { Platform } from "react-native";
 const INSTALLATION_ID_KEY = "push-installation-id";
 const ANDROID_CHANNEL_ID = "messages";
 
-/** In the foreground the in-app banner handles messages, so the OS banner stays hidden. */
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: false,
@@ -55,12 +54,10 @@ export async function registerForPushNotifications() {
   });
 }
 
-/** Must run while the user is still authenticated. */
 export async function unregisterFromPushNotifications() {
   try {
     const installationId = await SecureStore.getItemAsync(INSTALLATION_ID_KEY);
     if (installationId) await unregisterPushDevice(installationId);
   } catch {
-    // Best effort: logout must not fail because push cleanup did.
   }
 }

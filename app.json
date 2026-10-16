@@ -86,7 +86,28 @@
           "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location so you can share it in chats."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-dynamic-app-icon",
+        {
+          "green": {
+            "image": "./assets/images/app-icons/green.png",
+            "prerendered": true
+          },
+          "blue": {
+            "image": "./assets/images/app-icons/blue.png",
+            "prerendered": true
+          },
+          "red": {
+            "image": "./assets/images/app-icons/red.png",
+            "prerendered": true
+          },
+          "orange": {
+            "image": "./assets/images/app-icons/orange.png",
+            "prerendered": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -9,6 +9,7 @@ export interface Chat {
   pinned?: boolean;
   archived?: boolean;
   lastMessage: string;
+  latestMessageId?: string;
   fromMe?: boolean;
   timestamp: Date;
   unreadCount?: number;
@@ -40,6 +41,7 @@ export interface ChatMessage {
   edited?: boolean;
   deleted?: boolean;
   reactions?: { userId: string; emoji: string }[];
+  senderId?: string;
   fromMe: boolean;
   timestamp: Date;
   status?: "sending" | "failed";

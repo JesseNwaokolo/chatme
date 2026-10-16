@@ -44,7 +44,6 @@ export const ChatListItem = ({ chat, onPress }: ChatListItemProps) => {
   const renderLeftActions = () => (
     <View
       style={styles.actionsRow}
-      // pointerEvents={openDirection === SwipeDirection.RIGHT ? "auto" : "none"}
     >
       <SwipeActionButton
         label={isMuted ? "Unmute" : "Mute"}
@@ -78,7 +77,6 @@ export const ChatListItem = ({ chat, onPress }: ChatListItemProps) => {
   const renderRightActions = () => (
     <View
       style={styles.actionsRow}
-      // pointerEvents={openDirection === SwipeDirection.LEFT ? "auto" : "none"}
     >
       <SwipeActionButton
         label="Delete"
@@ -132,8 +130,6 @@ export const ChatListItem = ({ chat, onPress }: ChatListItemProps) => {
       friction={2}
       overshootLeft={false}
       overshootRight={false}
-      // onSwipeableWillOpen={setOpenDirection}
-      // onSwipeableWillClose={() => setOpenDirection(null)}
     >
       <Pressable style={styles.row} onPress={onPress}>
         <Avatar

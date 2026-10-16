@@ -27,6 +27,7 @@ const toChat = (conversation: ConversationResponse): Chat => {
     avatarUrl: isGroup ? conversation.avatarUrl : conversation.otherParticipant.avatarUrl,
     isGroup,
     lastMessage: conversation.latestMessage?.preview ?? "No messages yet",
+    latestMessageId: conversation.latestMessage?.id,
     fromMe: conversation.latestMessage?.senderId === myUserId,
     timestamp: new Date(conversation.latestMessage?.createdAt ?? conversation.lastActivityAt),
     unreadCount: conversation.unreadCount,
@@ -36,14 +37,27 @@ const toChat = (conversation: ConversationResponse): Chat => {
   };
 };
 
-export const getConversations = () =>
-  apiClient
-    .get<ConversationListResponse>(endpoints.conversations.list)
-    .then((res) => res.data.items.map(toChat))
-    .catch((err) => {
-      console.log("[chats] getConversations failed:", err);
-      throw err;
+export const cursorOf = (cursor: ConversationListResponse["pageInfo"]["nextCursor"]) =>
+  cursor == null ? undefined : typeof cursor === "string" ? cursor : JSON.stringify(cursor);
+
+const LIST_PAGE_SIZE = 50;
+const LIST_MAX_PAGES = 10;
+
+export const getConversations = async () => {
+  const chats: Chat[] = [];
+  let cursor: string | undefined;
+
+  for (let page = 0; page < LIST_MAX_PAGES; page++) {
+    const { data } = await apiClient.get<ConversationListResponse>(endpoints.conversations.list, {
+      params: { limit: LIST_PAGE_SIZE, cursor },
     });
+    chats.push(...data.items.map(toChat));
+    cursor = cursorOf(data.pageInfo.nextCursor);
+    if (!data.pageInfo.hasNextPage || !cursor) break;
+  }
+
+  return chats;
+};
 
 export const getArchivedConversations = (params: { cursor?: string; limit?: number } = {}) =>
   apiClient

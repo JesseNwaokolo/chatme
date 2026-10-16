@@ -2,10 +2,6 @@ import useMutedChatsStore from "@/src/store/useMutedChatsStore";
 import Toast from "react-native-toast-message";
 import { useMuteConversation, useUnmuteConversation } from "./useConversationActions";
 
-/**
- * Mutes/unmutes a conversation on the server (source of truth) and mirrors it in the
- * local store, which the in-app banner uses to suppress notifications instantly.
- */
 export function useMuteToggle(conversationId: string, serverMuted?: boolean) {
   const localMuted = useMutedChatsStore((s) => s.mutedConversationIds.includes(conversationId));
   const muteLocal = useMutedChatsStore((s) => s.mute);

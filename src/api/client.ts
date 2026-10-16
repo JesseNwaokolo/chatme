@@ -5,6 +5,7 @@ import { create, InternalAxiosRequestConfig } from "axios";
 import { API_BASE_URL } from "./config";
 import { endpoints } from "./endpoints";
 import { normalizeError } from "./errors";
+import { clearPersistedCache } from "./queryPersister";
 
 interface RetryableRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
@@ -20,6 +21,7 @@ export const apiClient = create({
 const clearSession = () => {
   useAuthStore.getState().clearTokens();
   useUserStore.getState().clearUser();
+  clearPersistedCache();
 };
 
 let refreshPromise: Promise<string> | null = null;

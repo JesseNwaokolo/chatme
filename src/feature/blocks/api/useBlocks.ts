@@ -1,6 +1,6 @@
 import { chatKeys } from "@/src/feature/chats/api/queryKeys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { blockUser, getBlockedUsers, unblockUser } from "./blocksApi";
+import { BlockResponse, blockUser, getBlockedUsers, unblockUser } from "./blocksApi";
 
 export const blockKeys = {
   all: ["blocks"] as const,
@@ -15,7 +15,11 @@ export function useBlockUser() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: blockUser,
-    onSuccess: () => {
+    onSuccess: (block) => {
+      queryClient.setQueryData<BlockResponse[]>(blockKeys.list(), (old) => [
+        ...(old ?? []).filter((item) => item.user.id !== block.user.id),
+        block,
+      ]);
       queryClient.invalidateQueries({ queryKey: blockKeys.list() });
       queryClient.invalidateQueries({ queryKey: chatKeys.all });
     },
@@ -26,9 +30,25 @@ export function useUnblockUser() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: unblockUser,
-    onSuccess: () => {
+    onMutate: async (userId: string) => {
+      await queryClient.cancelQueries({ queryKey: blockKeys.list() });
+      const previous = queryClient.getQueryData<BlockResponse[]>(blockKeys.list());
+      queryClient.setQueryData<BlockResponse[]>(blockKeys.list(), (old) =>
+        old?.filter((item) => item.user.id !== userId),
+      );
+      return { previous };
+    },
+    onError: (_error, _userId, context) => {
+      if (context?.previous) queryClient.setQueryData(blockKeys.list(), context.previous);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: blockKeys.list() });
       queryClient.invalidateQueries({ queryKey: chatKeys.all });
     },
   });
+}
+
+export function useIsBlocked(userId?: string | null) {
+  const { data } = useBlockedUsers();
+  return !!userId && !!data?.some((item) => item.user.id === userId);
 }

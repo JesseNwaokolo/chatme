@@ -91,8 +91,6 @@ export const AttachmentPickerSheet = ({
   };
 
   const handleThumbnailPress = async (asset: MediaLibrary.Asset) => {
-    // Android URIs are already readable; resolving info there needs ACCESS_MEDIA_LOCATION.
-    // iOS `ph://` URIs must be resolved to a local file.
     let uri = asset.uri;
     if (Platform.OS === "ios") {
       try {

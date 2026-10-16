@@ -18,7 +18,6 @@ const formatResultDate = (iso: string) => {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 };
 
-/** Splits text around the first match so the match can be rendered in bold. */
 const splitAroundMatch = (text: string, query: string) => {
   const index = text.toLowerCase().indexOf(query.toLowerCase());
   if (index === -1) return { before: text, match: "", after: "" };

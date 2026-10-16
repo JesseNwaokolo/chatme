@@ -4,7 +4,9 @@ import { getAuthStatus } from "@/src/feature/auth/utils/getAuthStatus";
 import { markDelivered } from "@/src/feature/chats/api/messagesApi";
 import { chatKeys } from "@/src/feature/chats/api/queryKeys";
 import { Chat } from "@/src/feature/chats/types";
+import { useChats } from "@/src/feature/chats/api/useChats";
 import { applyUnreadCount } from "@/src/feature/chats/utils/applyUnreadCount";
+import { eventToMessage, upsertMessageInCache } from "@/src/feature/chats/utils/messageCache";
 import { InAppNotificationBanner } from "@/src/shared/components/InAppNotificationBanner";
 import { registerForPushNotifications } from "@/src/shared/notifications/pushNotifications";
 import { playNotificationSound } from "@/src/shared/utils/notificationSound";
@@ -17,7 +19,7 @@ import useUserStore from "@/src/store/useUserStore";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
 import { Redirect, Stack, useRouter } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 
 const AppLayout = () => {
@@ -27,6 +29,21 @@ const AppLayout = () => {
   const isSocketConnected = useSocketStore((s) => s.isConnected);
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { data: chats } = useChats();
+  const deliveredRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!isSocketConnected || !chats) return;
+
+    for (const chat of chats) {
+      if (!chat.unreadCount || chat.fromMe || !chat.latestMessageId) continue;
+      const key = `${chat.id}:${chat.latestMessageId}`;
+      if (deliveredRef.current.has(key)) continue;
+      deliveredRef.current.add(key);
+
+      markDelivered(chat.id, chat.latestMessageId).catch(() => deliveredRef.current.delete(key));
+    }
+  }, [chats, isSocketConnected]);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -58,7 +75,6 @@ const AppLayout = () => {
     };
 
     const subscription = Notifications.addNotificationResponseReceivedListener(openFromNotification);
-    // App launched by tapping a notification while it was closed.
     Notifications.getLastNotificationResponseAsync().then((response) => {
       if (response) openFromNotification(response);
     });
@@ -84,11 +100,13 @@ const AppLayout = () => {
     if (!socket) return;
 
     const handleMessageCreated = (payload: MessageCreatedEvent) => {
+      upsertMessageInCache(queryClient, eventToMessage(payload));
       queryClient.invalidateQueries({ queryKey: chatKeys.list() });
 
       const myUserId = useUserStore.getState().user?.id;
       if (payload.senderId === myUserId) return;
 
+      deliveredRef.current.add(`${payload.conversationId}:${payload.id}`);
       markDelivered(payload.conversationId, payload.id)
         .then((data) => applyUnreadCount(queryClient, data.conversationId, data.unreadCount))
         .catch(() => {});

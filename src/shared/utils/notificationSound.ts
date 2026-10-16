@@ -18,6 +18,5 @@ export const playNotificationSound = async () => {
     await activePlayer.seekTo(0);
     activePlayer.play();
   } catch {
-    // ignore playback failures (e.g. player not ready)
   }
 };

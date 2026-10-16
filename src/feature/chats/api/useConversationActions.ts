@@ -18,7 +18,7 @@ import {
 } from "./chatsApi";
 import { clearConversationMessages, markAllRead } from "./messagesApi";
 import { chatKeys } from "./queryKeys";
-import { GroupMemberRole, MuteDuration } from "./types";
+import { ConversationResponse, GroupMemberRole, MuteDuration } from "./types";
 
 function useInvalidateChats(conversationId?: string) {
   const queryClient = useQueryClient();
@@ -27,6 +27,7 @@ function useInvalidateChats(conversationId?: string) {
     queryClient.invalidateQueries({ queryKey: chatKeys.archived() });
     if (conversationId) {
       queryClient.invalidateQueries({ queryKey: chatKeys.detail(conversationId) });
+      queryClient.invalidateQueries({ queryKey: chatKeys.messages(conversationId) });
     }
   };
 }
@@ -48,11 +49,32 @@ export function useUnmuteConversation(conversationId: string) {
 }
 
 export function useFavoriteConversation(conversationId: string) {
-  const invalidate = useInvalidateChats(conversationId);
+  const queryClient = useQueryClient();
+  const detailKey = chatKeys.detail(conversationId);
+
   return useMutation({
     mutationFn: (favorite: boolean) =>
       favorite ? favoriteConversation(conversationId) : unfavoriteConversation(conversationId),
-    onSuccess: invalidate,
+    onMutate: async (favorite) => {
+      await queryClient.cancelQueries({ queryKey: detailKey });
+      const previous = queryClient.getQueryData<ConversationResponse>(detailKey);
+      if (previous) {
+        queryClient.setQueryData<ConversationResponse>(detailKey, {
+          ...previous,
+          settings: previous.settings
+            ? { ...previous.settings, favorited: favorite }
+            : previous.settings,
+        });
+      }
+      return { previous };
+    },
+    onError: (_error, _favorite, context) => {
+      if (context?.previous) queryClient.setQueryData(detailKey, context.previous);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: detailKey });
+      queryClient.invalidateQueries({ queryKey: [...chatKeys.all, "favorites"] });
+    },
   });
 }
 

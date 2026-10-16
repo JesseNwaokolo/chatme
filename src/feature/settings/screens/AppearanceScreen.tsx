@@ -4,19 +4,49 @@ import { EmojiIcon, MoonIcon } from "@/src/shared/icons";
 import { useTheme } from "@/src/theme/useTheme";
 import { Theme } from "@/src/theme/useThemeStore";
 import { useFocusEffect } from "expo-router";
+import { getAppIcon, setAppIcon as applyAppIcon } from "expo-dynamic-app-icon";
 import { setStatusBarStyle } from "expo-status-bar";
 import { useCallback, useState } from "react";
-import { ImageBackground, ScrollView, StyleSheet, View } from "react-native";
+import {
+  ImageBackground,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { AppIconSwatch } from "../components/AppIconSwatch";
 import { SettingsRow } from "../components/SettingsRow";
 import { ThemeSwatch } from "../components/ThemeSwatch";
 import { THEME_COLOR_OPTIONS } from "../constants/themeOptions";
 
+const getCurrentAppIcon = () => {
+  if (Platform.OS === "web") return "Green";
+  try {
+    const current = getAppIcon();
+    return (
+      THEME_COLOR_OPTIONS.find(
+        (o) => o.name.toLowerCase() === current.toLowerCase(),
+      )?.name ?? "Green"
+    );
+  } catch {
+    return "Green";
+  }
+};
+
 const AppearanceScreen = () => {
   const { theme, mode, setMode, accentColor, setAccentColor } = useTheme();
   const styles = makeStyles(theme);
   const [largeEmoji, setLargeEmoji] = useState(false);
-  const [appIcon, setAppIcon] = useState("Green");
+  const [appIcon, setAppIcon] = useState(getCurrentAppIcon);
+
+  const handleSelectAppIcon = (name: string) => {
+    if (name === appIcon) return;
+    try {
+      if (applyAppIcon(name.toLowerCase()) === false) return;
+      setAppIcon(name);
+    } catch {
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -52,7 +82,12 @@ const AppearanceScreen = () => {
             <StyledText size={12} style={{ color: theme.textSecondary }}>
               19:40
             </StyledText>
-            <View style={[styles.outgoingBubble, { backgroundColor: theme.buttonPrimary }]}>
+            <View
+              style={[
+                styles.outgoingBubble,
+                { backgroundColor: theme.buttonPrimary },
+              ]}
+            >
               <StyledText size={14} style={{ color: theme.buttonPrimaryText }}>
                 Gravida lectus semper orci
               </StyledText>
@@ -105,7 +140,7 @@ const AppearanceScreen = () => {
                 color={option.color}
                 lightColor={option.lightColor}
                 selected={option.name === appIcon}
-                onPress={() => setAppIcon(option.name)}
+                onPress={() => handleSelectAppIcon(option.name)}
               />
             ))}
           </View>

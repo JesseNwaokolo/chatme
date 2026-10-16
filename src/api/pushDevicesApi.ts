@@ -7,7 +7,6 @@ export interface PushDevice {
   registeredAt: string;
 }
 
-/** `token` must be an Expo push token (ExponentPushToken[...]). */
 export const registerPushDevice = (
   installationId: string,
   body: { platform: "ios" | "android"; token: string },
