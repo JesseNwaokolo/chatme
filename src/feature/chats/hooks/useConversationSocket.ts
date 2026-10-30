@@ -12,6 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { chatKeys } from "../api/queryKeys";
 import { ReceiptFrontiersResponse } from "../api/types";
 import { useEffect, useRef, useState } from "react";
+import { describeError } from "@/src/helpers/redact";
 
 interface UseConversationSocketOptions {
   conversationId: string;
@@ -50,17 +51,21 @@ export function useConversationSocket({
   useEffect(() => {
     if (!isConnected) return;
 
+    // The ack belongs to this effect run; a newer conversation/participant must not be overwritten.
+    let cancelled = false;
     acquirePresence(conversationId)
       .then(({ participants, typing }) => {
+        if (cancelled) return;
         const participant = participants.find((p) => p.userId === participantId);
         setIsOtherOnline(participant?.status === "online");
         setIsOtherTyping(typing.includes(participantId));
       })
       .catch((err) => {
-        if (__DEV__) console.log("[useConversationSocket] acquirePresence failed:", err);
+        if (__DEV__) console.log("[useConversationSocket] acquirePresence failed:", describeError(err));
       });
 
     return () => {
+      cancelled = true;
       releasePresence(conversationId);
     };
   }, [conversationId, participantId, isConnected]);

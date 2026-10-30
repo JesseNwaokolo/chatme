@@ -23,6 +23,15 @@ export function eventToMessage(event: MessageCreatedEvent): MessageResponse {
   };
 }
 
+// Identity prevents duplicates; version ordering prevents regression. A response that
+// is older than what the cache already holds must not overwrite it (e.g. a slow history
+// fetch landing after an edit or delete event). Equal versions merge so same-version
+// observations (e.g. reaction changes) still apply.
+export function mergeMessage(existing: MessageResponse, incoming: MessageResponse): MessageResponse {
+  if ((incoming.version ?? 0) < (existing.version ?? 0)) return existing;
+  return { ...existing, ...incoming };
+}
+
 export function upsertMessageInCache(queryClient: QueryClient, message: MessageResponse) {
   queryClient.setQueryData<MessagesData>(chatKeys.messages(message.conversationId), (old) => {
     if (!old || old.pages.length === 0) return old;
@@ -33,7 +42,7 @@ export function upsertMessageInCache(queryClient: QueryClient, message: MessageR
       items: page.items.map((item) => {
         if (!isSameMessage(item, message)) return item;
         found = true;
-        return { ...item, ...message };
+        return mergeMessage(item, message);
       }),
     }));
 

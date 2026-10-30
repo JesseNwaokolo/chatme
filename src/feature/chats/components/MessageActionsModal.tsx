@@ -28,7 +28,12 @@ export const MessageActionsModal = ({
 
   return (
     <Modal visible={!!message} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable
+        style={styles.backdrop}
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Close message options"
+      >
         {message && (
           <Pressable style={styles.card}>
             <View style={styles.emojiRow}>
@@ -36,6 +41,9 @@ export const MessageActionsModal = ({
                 <Pressable
                   key={emoji}
                   style={[styles.emoji, myReaction === emoji && styles.emojiSelected]}
+                  accessibilityRole="button"
+                  accessibilityLabel={myReaction === emoji ? `Remove ${emoji} reaction` : `React ${emoji}`}
+                  accessibilityState={{ selected: myReaction === emoji }}
                   onPress={() => {
                     onReact(message, myReaction === emoji ? null : emoji);
                     onClose();
@@ -50,6 +58,7 @@ export const MessageActionsModal = ({
               <>
                 <Pressable
                   style={styles.action}
+                  accessibilityRole="button"
                   onPress={() => {
                     onEdit(message);
                     onClose();
@@ -61,6 +70,7 @@ export const MessageActionsModal = ({
                 </Pressable>
                 <Pressable
                   style={styles.action}
+                  accessibilityRole="button"
                   onPress={() => {
                     onDelete(message);
                     onClose();

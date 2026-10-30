@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from "axios";
 import { apiClient } from "./client";
 import { endpoints } from "./endpoints";
 
@@ -15,7 +16,7 @@ export const registerPushDevice = (
     .put<PushDevice>(endpoints.push.device(installationId), body)
     .then((res) => res.data);
 
-export const unregisterPushDevice = (installationId: string) =>
-  apiClient.delete<void>(endpoints.push.device(installationId)).then(() => undefined);
+export const unregisterPushDevice = (installationId: string, config?: AxiosRequestConfig) =>
+  apiClient.delete<void>(endpoints.push.device(installationId), config).then(() => undefined);
 
 export const getHealth = () => apiClient.get(endpoints.health).then((res) => res.data);

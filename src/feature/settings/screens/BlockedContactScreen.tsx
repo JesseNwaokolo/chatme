@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlockedContactRow } from "../components/BlockedContactRow";
 import { useBlockedUsers, useUnblockUser } from "@/src/feature/blocks/api/useBlocks";
 import Toast from "react-native-toast-message";
+import { describeError } from "@/src/helpers/redact";
 
 const BlockedContactScreen = () => {
   const { theme } = useTheme();
@@ -26,7 +27,7 @@ const BlockedContactScreen = () => {
         onPress: () =>
           unblock.mutate(userId, {
             onError: (error) => {
-              console.log("[blocks] unblock failed:", error);
+              console.log("[blocks] unblock failed:", describeError(error));
               Toast.show({
                 type: "error",
                 text1: "Couldn't unblock contact",

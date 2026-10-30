@@ -5,10 +5,14 @@ import { Theme } from "@/src/theme/useThemeStore";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PickedMedia } from "../types";
-import { ActivityIndicator, Alert, FlatList, Platform, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Linking, Platform, Pressable, StyleSheet, View } from "react-native";
+import Toast from "react-native-toast-message";
 import Animated, { FadeInDown, FadeOutDown } from "react-native-reanimated";
+import { describeError } from "@/src/helpers/redact";
+
+type StripState = "loading" | "ready" | "limited" | "denied" | "error";
 
 interface AttachmentPickerSheetProps {
   onPickMedia: (items: PickedMedia[]) => void;
@@ -27,33 +31,41 @@ export const AttachmentPickerSheet = ({
   const styles = makeStyles(theme);
 
   const [recentPhotos, setRecentPhotos] = useState<MediaLibrary.Asset[]>([]);
-  const [loadingPhotos, setLoadingPhotos] = useState(true);
+  const [strip, setStrip] = useState<StripState>("loading");
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setStrip("loading");
 
     (async () => {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== "granted" || cancelled) {
-        setLoadingPhotos(false);
-        return;
-      }
-
-      const { assets } = await MediaLibrary.getAssetsAsync({
-        mediaType: ["photo", "video"],
-        sortBy: "creationTime",
-        first: 30,
-      });
-      if (!cancelled) {
+      try {
+        const permission = await MediaLibrary.requestPermissionsAsync();
+        if (cancelled) return;
+        if (permission.status !== "granted") {
+          setStrip("denied");
+          return;
+        }
+        const { assets } = await MediaLibrary.getAssetsAsync({
+          mediaType: ["photo", "video"],
+          sortBy: "creationTime",
+          first: 30,
+        });
+        if (cancelled) return;
         setRecentPhotos(assets);
-        setLoadingPhotos(false);
+        setStrip(permission.accessPrivileges === "limited" ? "limited" : "ready");
+      } catch (error) {
+        console.log("[picker] recent media failed:", describeError(error));
+        if (!cancelled) setStrip("error");
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
+
+  const retryStrip = useCallback(() => setAttempt((n) => n + 1), []);
 
   const toPicked = (asset: ImagePicker.ImagePickerAsset): PickedMedia => ({
     uri: asset.uri,
@@ -63,31 +75,51 @@ export const AttachmentPickerSheet = ({
     fileSize: asset.fileSize,
   });
 
+  const alertPermissionDenied = (message: string, canAskAgain: boolean) =>
+    Alert.alert(
+      "Permission needed",
+      message,
+      canAskAgain
+        ? [{ text: "OK" }]
+        : [{ text: "Not now", style: "cancel" }, { text: "Open Settings", onPress: () => Linking.openSettings() }],
+    );
+
+  const launch = async (open: () => Promise<ImagePicker.ImagePickerResult>) => {
+    try {
+      const result = await open();
+      if (!result.canceled) onPickMedia(result.assets.map(toPicked));
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Couldn't open the picker",
+        text2: error instanceof Error ? error.message : undefined,
+      });
+    }
+  };
+
   const handleTakePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    const { status, canAskAgain } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Allow camera access to take a photo.");
+      alertPermissionDenied("Allow camera access to take a photo.", canAskAgain);
       return;
     }
-
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.8 });
-    if (!result.canceled) onPickMedia(result.assets.map(toPicked));
+    await launch(() => ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.8 }));
   };
 
   const handleChooseFromLibrary = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Allow photo library access to share photos.");
+      alertPermissionDenied("Allow photo library access to share photos.", canAskAgain);
       return;
     }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images", "videos"],
-      allowsMultipleSelection: true,
-      selectionLimit: 10,
-      quality: 0.8,
-    });
-    if (!result.canceled) onPickMedia(result.assets.map(toPicked));
+    await launch(() =>
+      ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images", "videos"],
+        allowsMultipleSelection: true,
+        selectionLimit: 10,
+        quality: 0.8,
+      }),
+    );
   };
 
   const handleThumbnailPress = async (asset: MediaLibrary.Asset) => {
@@ -115,51 +147,93 @@ export const AttachmentPickerSheet = ({
       style={styles.sheet}
     >
       <View style={styles.stripRow}>
-        {loadingPhotos ? (
-          <ActivityIndicator color={theme.buttonPrimary} />
+        {strip === "loading" ? (
+          <ActivityIndicator color={theme.buttonPrimary} accessibilityLabel="Loading recent photos" />
         ) : (
           <FlatList
-            data={recentPhotos}
+            data={strip === "ready" || strip === "limited" ? recentPhotos : []}
             horizontal
             showsHorizontalScrollIndicator={false}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.stripContent}
             ListHeaderComponent={
-              <Pressable style={styles.cameraTile} onPress={handleTakePhoto}>
+              <Pressable
+                style={styles.cameraTile}
+                onPress={handleTakePhoto}
+                accessibilityRole="button"
+                accessibilityLabel="Take a photo"
+              >
                 <CameraIcon size={28} color={theme.bgNeutral} />
               </Pressable>
             }
+            ListEmptyComponent={
+              strip === "denied" || strip === "error" ? (
+                <View style={styles.stripMessage}>
+                  <StyledText size={13} style={{ color: theme.textSecondary }}>
+                    {strip === "denied"
+                      ? "Allow photo access to see recent photos."
+                      : "Couldn't load recent photos."}
+                  </StyledText>
+                  <Pressable
+                    onPress={strip === "denied" ? () => Linking.openSettings() : retryStrip}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={strip === "denied" ? "Open settings" : "Retry loading recent photos"}
+                  >
+                    <StyledText size={13} weight="bold" style={{ color: theme.buttonPrimary }}>
+                      {strip === "denied" ? "Open Settings" : "Retry"}
+                    </StyledText>
+                  </Pressable>
+                </View>
+              ) : null
+            }
             renderItem={({ item }) => (
-              <Pressable onPress={() => handleThumbnailPress(item)}>
+              <Pressable
+                onPress={() => handleThumbnailPress(item)}
+                accessibilityRole="imagebutton"
+                accessibilityLabel={item.mediaType === "video" ? "Recent video" : "Recent photo"}
+              >
                 <Image source={{ uri: item.uri }} style={styles.thumb} contentFit="cover" />
               </Pressable>
             )}
           />
         )}
       </View>
+      {strip === "limited" && (
+        <Pressable
+          onPress={() => Linking.openSettings()}
+          accessibilityRole="button"
+          accessibilityLabel="Showing selected photos only. Open settings to allow more."
+          style={styles.limitedNote}
+        >
+          <StyledText size={12} style={{ color: theme.textSecondary }}>
+            Showing selected photos only · <StyledText size={12} weight="bold" style={{ color: theme.buttonPrimary }}>Manage</StyledText>
+          </StyledText>
+        </Pressable>
+      )}
 
-      <Pressable style={styles.row} onPress={handleChooseFromLibrary}>
+      <Pressable style={styles.row} onPress={handleChooseFromLibrary} accessibilityRole="button" accessibilityLabel="Photo or Gallery">
         <GalleryIcon color={theme.buttonPrimary} />
         <StyledText weight="medium" size={16}>
           Photo or Gallery
         </StyledText>
       </Pressable>
 
-      <Pressable style={styles.row} onPress={onPickDocument}>
+      <Pressable style={styles.row} onPress={onPickDocument} accessibilityRole="button" accessibilityLabel="Document">
         <DocumentIcon color={theme.buttonPrimary} />
         <StyledText weight="medium" size={16}>
           Document
         </StyledText>
       </Pressable>
 
-      <Pressable style={styles.row} onPress={onPickLocation}>
+      <Pressable style={styles.row} onPress={onPickLocation} accessibilityRole="button" accessibilityLabel="Location">
         <LocationIcon color={theme.buttonPrimary} />
         <StyledText weight="medium" size={16}>
           Location
         </StyledText>
       </Pressable>
 
-      <Pressable style={styles.row} onPress={onPickContact}>
+      <Pressable style={styles.row} onPress={onPickContact} accessibilityRole="button" accessibilityLabel="Contact">
         <PersonIcon size={20} color={theme.buttonPrimary} />
         <StyledText weight="medium" size={16}>
           Contact
@@ -200,6 +274,16 @@ const makeStyles = (theme: Theme) => {
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: theme.textSecondary,
+    },
+    stripMessage: {
+      height: 104,
+      justifyContent: "center",
+      gap: 4,
+      paddingRight: 16,
+    },
+    limitedNote: {
+      paddingHorizontal: 20,
+      paddingBottom: 8,
     },
     thumb: {
       width: 104,

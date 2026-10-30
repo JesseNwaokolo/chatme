@@ -32,6 +32,7 @@ const toChat = (conversation: ConversationResponse): Chat => {
     timestamp: new Date(conversation.latestMessage?.createdAt ?? conversation.lastActivityAt),
     unreadCount: conversation.unreadCount,
     muted: conversation.settings?.muted,
+    mutedUntil: conversation.settings?.mutedUntil,
     pinned: conversation.settings?.pinned,
     archived: conversation.settings?.archived,
   };
