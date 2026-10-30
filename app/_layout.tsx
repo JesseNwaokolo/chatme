@@ -3,6 +3,7 @@ import { queryClient } from "@/src/api/queryClient";
 import { queryPersister } from "@/src/api/queryPersister";
 import { chatKeys } from "@/src/feature/chats/api/queryKeys";
 import { toastConfig } from "@/src/shared/components/toastConfig";
+import { NotificationRouter } from "@/src/shared/notifications/NotificationRouter";
 import useAuthStore from "@/src/store/useAuthStore";
 import useUserStore from "@/src/store/useUserStore";
 import { darkTheme } from "@/src/theme/colors";
@@ -64,6 +65,7 @@ export default function RootLayout() {
             <BottomSheetModalProvider>
               <StatusBar style={isDarkTheme ? "light" : "dark"} />
               <Stack screenOptions={{ headerShown: false }} />
+              <NotificationRouter />
             </BottomSheetModalProvider>
             <Toast config={toastConfig} />
           </KeyboardProvider>

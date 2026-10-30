@@ -18,7 +18,11 @@ export function acquirePresence(conversationId: string): Promise<PresenceSubscri
 }
 
 export function releasePresence(conversationId: string): void {
-  const next = (refCounts.get(conversationId) ?? 1) - 1;
+  const count = refCounts.get(conversationId);
+  // No entry means the connection dropped and the server already forgot this subscription;
+  // unsubscribing now could cancel one re-acquired after reconnect.
+  if (count === undefined) return;
+  const next = count - 1;
   if (next <= 0) {
     refCounts.delete(conversationId);
     unsubscribePresence(conversationId).catch(() => {});

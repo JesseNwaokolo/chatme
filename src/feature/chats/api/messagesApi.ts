@@ -3,25 +3,24 @@ import { endpoints } from "@/src/api/endpoints";
 import {
   ClearMessagesResponse,
   ConversationReadStateResponse,
-  MessageListResponse,
-  MessageResponse,
   ReceiptActionResponse,
   ReceiptFrontiersResponse,
   SendMessageRequest,
 } from "./types";
+import { parseMessageList, parseMessageResponse } from "./parsers";
 
 export const sendMessage = (conversationId: string, payload: SendMessageRequest) =>
   apiClient
-    .post<MessageResponse>(endpoints.conversations.messages(conversationId), payload)
-    .then((res) => res.data);
+    .post<unknown>(endpoints.conversations.messages(conversationId), payload)
+    .then((res) => parseMessageResponse(res.data));
 
 export const getMessages = (
   conversationId: string,
   params: { limit?: number; cursor?: string } = {},
 ) =>
   apiClient
-    .get<MessageListResponse>(endpoints.conversations.messages(conversationId), { params })
-    .then((res) => res.data);
+    .get<unknown>(endpoints.conversations.messages(conversationId), { params })
+    .then((res) => parseMessageList(res.data));
 
 export const markDelivered = (conversationId: string, throughMessageId: string) =>
   apiClient
@@ -39,8 +38,8 @@ export const markRead = (conversationId: string, throughMessageId: string) =>
 
 export const getMessage = (conversationId: string, messageId: string) =>
   apiClient
-    .get<MessageResponse>(endpoints.conversations.message(conversationId, messageId))
-    .then((res) => res.data);
+    .get<unknown>(endpoints.conversations.message(conversationId, messageId))
+    .then((res) => parseMessageResponse(res.data));
 
 export const editMessage = (
   conversationId: string,
@@ -48,31 +47,31 @@ export const editMessage = (
   body: { text: string | null; expectedVersion: number },
 ) =>
   apiClient
-    .patch<MessageResponse>(endpoints.conversations.message(conversationId, messageId), body)
-    .then((res) => res.data);
+    .patch<unknown>(endpoints.conversations.message(conversationId, messageId), body)
+    .then((res) => parseMessageResponse(res.data));
 
 export const deleteMessage = (conversationId: string, messageId: string) =>
   apiClient
-    .delete<MessageResponse>(endpoints.conversations.message(conversationId, messageId))
-    .then((res) => res.data);
+    .delete<unknown>(endpoints.conversations.message(conversationId, messageId))
+    .then((res) => parseMessageResponse(res.data));
 
 export const setReaction = (conversationId: string, messageId: string, emoji: string) =>
   apiClient
-    .put<MessageResponse>(endpoints.conversations.reaction(conversationId, messageId), { emoji })
-    .then((res) => res.data);
+    .put<unknown>(endpoints.conversations.reaction(conversationId, messageId), { emoji })
+    .then((res) => parseMessageResponse(res.data));
 
 export const removeReaction = (conversationId: string, messageId: string) =>
   apiClient
-    .delete<MessageResponse>(endpoints.conversations.reaction(conversationId, messageId))
-    .then((res) => res.data);
+    .delete<unknown>(endpoints.conversations.reaction(conversationId, messageId))
+    .then((res) => parseMessageResponse(res.data));
 
 export const searchMessages = (
   conversationId: string,
   params: { q: string; limit?: number; cursor?: string },
 ) =>
   apiClient
-    .get<MessageListResponse>(endpoints.conversations.searchMessages(conversationId), { params })
-    .then((res) => res.data);
+    .get<unknown>(endpoints.conversations.searchMessages(conversationId), { params })
+    .then((res) => parseMessageList(res.data));
 
 export const clearConversationMessages = (conversationId: string) =>
   apiClient

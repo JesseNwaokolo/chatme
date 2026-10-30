@@ -1,6 +1,6 @@
 import { apiClient } from "@/src/api/client";
 import { endpoints } from "@/src/api/endpoints";
-import axios from "axios";
+import axios, { isAxiosError } from "axios";
 import * as Crypto from "expo-crypto";
 
 export type MediaPurpose = "profile_avatar" | "group_avatar" | "message_attachment";
@@ -22,14 +22,46 @@ export interface Media {
   completedAt: string | null;
 }
 
+interface UploadTarget {
+  url: string;
+  method: string;
+  expiresAt: string;
+  fields: Record<string, string>;
+}
+
+// `upload` is null when the server recognises the clientUploadId and the file is already
+// stored (a replayed create), so there is nothing left to transfer.
 interface CreateUploadResponse {
   media: Media;
-  upload: {
-    url: string;
-    method: string;
-    expiresAt: string;
-    fields: Record<string, string>;
-  };
+  upload: UploadTarget | null;
+}
+
+// Which step runs next. `clientUploadId` and `mediaId` are the identifiers that must stay the
+// same across retries so the server can recognise the upload instead of creating a second one.
+// Signed upload targets are deliberately not part of this record: they are credentials, so
+// they are never persisted and a retry asks the server for a fresh one.
+export type UploadStage = "create" | "transfer" | "complete" | "done";
+
+export interface UploadProgress {
+  clientUploadId: string;
+  stage: UploadStage;
+  mediaId?: string;
+}
+
+export const newUploadProgress = (): UploadProgress => ({
+  clientUploadId: Crypto.randomUUID(),
+  stage: "create",
+});
+
+export class UploadError extends Error {
+  constructor(
+    readonly stage: Exclude<UploadStage, "done">,
+    message: string,
+    readonly cause?: unknown,
+  ) {
+    super(message);
+    this.name = "UploadError";
+  }
 }
 
 const MIME_TYPES: Record<string, string> = {
@@ -101,45 +133,86 @@ const createUpload = (body: {
 const completeUpload = (mediaId: string) =>
   apiClient.post<Media>(endpoints.media.completeUpload(mediaId)).then((res) => res.data);
 
-export async function uploadMedia(params: {
+export interface UploadParams {
   uri: string;
   purpose: MediaPurpose;
   contentType?: string;
   filename?: string;
   sizeBytes?: number;
-}): Promise<Media> {
+}
+
+const transferMessage = (error: unknown) =>
+  isAxiosError(error)
+    ? (error.response?.data?.error?.message ?? "Couldn't upload file")
+    : error instanceof Error
+      ? error.message
+      : "Couldn't upload file";
+
+async function transferFile(target: UploadTarget, file: { uri: string; type: string; name: string }) {
+  const formData = new FormData();
+  Object.entries(target.fields).forEach(([key, value]) => formData.append(key, value));
+  formData.append("file", file as unknown as Blob);
+  await axios.post(target.url, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+}
+
+// Runs the create, transfer and complete stages, resuming from `progress`. `onProgress` is
+// called after each stage so the caller can persist it; a failure is thrown as an
+// UploadError naming the stage that failed, and the last reported progress is what to retry with.
+export async function uploadMedia(
+  params: UploadParams,
+  progress: UploadProgress = newUploadProgress(),
+  onProgress: (progress: UploadProgress) => void = () => {},
+): Promise<{ id: string }> {
   const contentType = resolveContentType(params.filename ?? params.uri, params.contentType);
   const extension = params.uri.split(".").pop()?.toLowerCase() ?? "jpg";
   const originalFilename = params.filename ?? `${params.purpose}-${Date.now()}.${extension}`;
 
-  const sizeBytes = params.sizeBytes ?? (await (await fetch(params.uri)).blob()).size;
+  let current = progress;
+  const advance = (next: Partial<UploadProgress>) => {
+    current = { ...current, ...next };
+    onProgress(current);
+  };
 
-  const { media, upload } = await createUpload({
-    clientUploadId: Crypto.randomUUID(),
-    purpose: params.purpose,
-    contentType,
-    sizeBytes,
-    originalFilename,
-  });
-
-  const formData = new FormData();
-  Object.entries(upload.fields).forEach(([key, value]) => formData.append(key, value));
-  formData.append("file", {
-    uri: params.uri,
-    type: contentType,
-    name: originalFilename,
-  } as unknown as Blob);
-
-  try {
-    await axios.post(upload.url, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.error?.message ?? "Couldn't upload file");
+  if (current.stage === "create" || current.stage === "transfer") {
+    // A retry of the transfer stage repeats create: the same clientUploadId yields the same
+    // media with a fresh target (or `upload: null` if the file already arrived).
+    let created: CreateUploadResponse;
+    try {
+      const sizeBytes = params.sizeBytes ?? (await (await fetch(params.uri)).blob()).size;
+      created = await createUpload({
+        clientUploadId: current.clientUploadId,
+        purpose: params.purpose,
+        contentType,
+        sizeBytes,
+        originalFilename,
+      });
+    } catch (error) {
+      throw new UploadError("create", transferMessage(error), error);
     }
-    throw error;
+    advance({ mediaId: created.media.id, stage: "transfer" });
+
+    if (created.upload) {
+      try {
+        await transferFile(created.upload, { uri: params.uri, type: contentType, name: originalFilename });
+      } catch (error) {
+        throw new UploadError("transfer", transferMessage(error), error);
+      }
+    }
+    advance({ stage: created.media.completedAt ? "done" : "complete" });
   }
 
-  return completeUpload(media.id);
+  if (current.stage === "complete") {
+    if (!current.mediaId) throw new UploadError("complete", "Upload is missing its media id");
+    try {
+      await completeUpload(current.mediaId);
+    } catch (error) {
+      throw new UploadError("complete", transferMessage(error), error);
+    }
+    advance({ stage: "done" });
+  }
+
+  if (!current.mediaId) throw new UploadError("complete", "Upload is missing its media id");
+  return { id: current.mediaId };
 }

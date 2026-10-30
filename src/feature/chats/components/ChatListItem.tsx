@@ -37,7 +37,7 @@ export const ChatListItem = ({ chat, onPress }: ChatListItemProps) => {
   const unarchiveMutation = useUnarchiveConversation();
   const pinMutation = usePinConversation();
   const unpinMutation = useUnpinConversation();
-  const { isMuted, setMuted } = useMuteToggle(chat.id, chat.muted);
+  const { isMuted, setMuted } = useMuteToggle(chat.id, chat);
 
   const [openDirection, setOpenDirection] = useState<SwipeDirection | null>(null);
 

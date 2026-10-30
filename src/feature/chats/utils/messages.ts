@@ -1,10 +1,43 @@
 import { MessageResponse, ReceiptFrontier } from "../api/types";
-import { ChatMessage } from "../types";
+import { OutboxEntry } from "@/src/store/useOutboxStore";
+import {
+  ChatMessage,
+  ConfirmedMessage,
+  FailedMessage,
+  SendingMessage,
+  UnsupportedMessage,
+} from "../types";
 
-export function toChatMessage(payload: MessageResponse, myUserId?: string): ChatMessage {
-  return {
+const SUPPORTED_KINDS = new Set(["text", "image", "audio", "video", "document"]);
+const SUPPORTED_ATTACHMENT_TYPES = new Set(["image", "audio", "video", "document"]);
+
+const isSupported = (payload: MessageResponse) =>
+  SUPPORTED_KINDS.has(payload.kind) &&
+  (payload.attachments ?? []).every((a) => SUPPORTED_ATTACHMENT_TYPES.has(a.type));
+
+export function toChatMessage(
+  payload: MessageResponse,
+  myUserId?: string,
+): ConfirmedMessage | UnsupportedMessage {
+  const core = {
     id: payload.id,
-    clientMessageId: payload.clientMessageId,
+    senderId: payload.senderId,
+    fromMe: payload.senderId === myUserId,
+    timestamp: new Date(payload.createdAt),
+    edited: !!payload.editedAt,
+    deleted: !!payload.deletedAt,
+    reactions: payload.reactions,
+    version: payload.version ?? 0,
+  };
+
+  if (!isSupported(payload)) {
+    return { ...core, state: "unsupported", kind: payload.kind, text: "" };
+  }
+
+  return {
+    ...core,
+    state: "confirmed",
+    clientMessageId: payload.clientMessageId || undefined,
     text: payload.text ?? "",
     attachments: payload.attachments?.map((a) => ({
       type: a.type,
@@ -14,24 +47,44 @@ export function toChatMessage(payload: MessageResponse, myUserId?: string): Chat
       width: a.width,
       height: a.height,
     })),
-    version: payload.version,
-    edited: !!payload.editedAt,
-    deleted: !!payload.deletedAt,
-    reactions: payload.reactions,
-    senderId: payload.senderId,
-    fromMe: payload.senderId === myUserId,
-    timestamp: new Date(payload.createdAt),
   };
 }
 
+export function outboxToChatMessage(entry: OutboxEntry): SendingMessage | FailedMessage {
+  const payload = { text: entry.text, attachments: entry.attachments };
+  const core = {
+    id: entry.clientMessageId,
+    clientMessageId: entry.clientMessageId,
+    text: entry.text ?? "",
+    attachments: entry.attachments.map((a) => ({
+      type: a.type,
+      url: a.uri,
+      filename: a.filename,
+      contentType: a.contentType,
+    })),
+    fromMe: true as const,
+    timestamp: new Date(entry.createdAt),
+    payload,
+  };
+  return entry.state === "failed"
+    ? { ...core, state: "failed", error: entry.error }
+    : { ...core, state: "sending" };
+}
+
+// Confirmed history first, then unconfirmed sends that history does not already contain.
 export function buildMessages(
   history: MessageResponse[],
-  pending: ChatMessage[],
+  outbox: OutboxEntry[],
   myUserId?: string,
 ): ChatMessage[] {
   const confirmed = history.map((item) => toChatMessage(item, myUserId)).reverse();
-  const confirmedClientIds = new Set(confirmed.map((m) => m.clientMessageId));
-  return [...confirmed, ...pending.filter((m) => !confirmedClientIds.has(m.clientMessageId))];
+  const confirmedClientIds = new Set(
+    history.map((m) => m.clientMessageId).filter((id): id is string => !!id),
+  );
+  const pending = outbox
+    .filter((entry) => !confirmedClientIds.has(entry.clientMessageId))
+    .map(outboxToChatMessage);
+  return [...confirmed, ...pending];
 }
 
 export interface ReceiptThresholds {

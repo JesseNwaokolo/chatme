@@ -7,20 +7,20 @@ import { Chat } from "@/src/feature/chats/types";
 import { useChats } from "@/src/feature/chats/api/useChats";
 import { applyUnreadCount } from "@/src/feature/chats/utils/applyUnreadCount";
 import { eventToMessage, upsertMessageInCache } from "@/src/feature/chats/utils/messageCache";
+import { isChatMuted } from "@/src/feature/chats/utils/mute";
 import { InAppNotificationBanner } from "@/src/shared/components/InAppNotificationBanner";
 import { registerForPushNotifications } from "@/src/shared/notifications/pushNotifications";
 import { playNotificationSound } from "@/src/shared/utils/notificationSound";
 import useActiveConversationStore from "@/src/store/useActiveConversationStore";
 import useAuthStore from "@/src/store/useAuthStore";
-import useMutedChatsStore from "@/src/store/useMutedChatsStore";
 import useNotificationBannerStore from "@/src/store/useNotificationBannerStore";
 import useSocketStore from "@/src/store/useSocketStore";
 import useUserStore from "@/src/store/useUserStore";
 import { useQueryClient } from "@tanstack/react-query";
-import * as Notifications from "expo-notifications";
-import { Redirect, Stack, useRouter } from "expo-router";
+import { Redirect, Stack } from "expo-router";
 import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
+import { describeError } from "@/src/helpers/redact";
 
 const AppLayout = () => {
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -28,7 +28,6 @@ const AppLayout = () => {
   const status = getAuthStatus(accessToken, user);
   const isSocketConnected = useSocketStore((s) => s.isConnected);
   const queryClient = useQueryClient();
-  const router = useRouter();
   const { data: chats } = useChats();
   const deliveredRef = useRef(new Set<string>());
 
@@ -48,38 +47,9 @@ const AppLayout = () => {
   useEffect(() => {
     if (!accessToken) return;
     registerForPushNotifications().catch((error) =>
-      console.log("[push] registration failed:", error),
+      console.log("[push] registration failed:", describeError(error)),
     );
   }, [accessToken]);
-
-  useEffect(() => {
-    const openFromNotification = (response: Notifications.NotificationResponse) => {
-      const data = response.notification.request.content.data as
-        | { conversationId?: string }
-        | undefined;
-      const conversationId = data?.conversationId;
-      if (!conversationId) return;
-
-      const chat = queryClient
-        .getQueryData<Chat[]>(chatKeys.list())
-        ?.find((c) => c.id === conversationId);
-      router.push({
-        pathname: "/conversation/[id]",
-        params: {
-          id: conversationId,
-          participantId: chat?.participantId ?? "",
-          name: chat?.name ?? "",
-          avatarUrl: chat?.avatarUrl ?? "",
-        },
-      });
-    };
-
-    const subscription = Notifications.addNotificationResponseReceivedListener(openFromNotification);
-    Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response) openFromNotification(response);
-    });
-    return () => subscription.remove();
-  }, [queryClient, router]);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -118,7 +88,7 @@ const AppLayout = () => {
       const chats = queryClient.getQueryData<Chat[]>(chatKeys.list());
       const chat = chats?.find((c) => c.id === payload.conversationId);
       if (!chat) return;
-      if (chat.muted || useMutedChatsStore.getState().isMuted(chat.id)) return;
+      if (isChatMuted(chat)) return;
 
       playNotificationSound();
 

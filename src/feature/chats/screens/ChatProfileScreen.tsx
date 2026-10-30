@@ -86,7 +86,7 @@ const ChatProfileScreen = () => {
         }),
     });
   };
-  const { isMuted, setMuted } = useMuteToggle(id, data?.settings?.muted);
+  const { isMuted, setMuted } = useMuteToggle(id, data?.settings);
   const myUserId = useUserStore((s) => s.user?.id);
   const favorite = useFavoriteConversation(id);
   const clearChat = useClearConversation(id);

@@ -67,6 +67,44 @@ const AttachmentView = ({
   );
 };
 
+function describeMessage(
+  message: ChatMessage,
+  time: string,
+  receiptStatus?: "sent" | "delivered" | "read",
+) {
+  const who = message.fromMe ? "You" : "Received";
+  const body = message.deleted
+    ? "This message was deleted"
+    : message.state === "unsupported"
+      ? "Unsupported message"
+      : [
+          ...(message.attachments ?? []).map((a) =>
+            a.type === "document" ? `Document ${a.filename ?? ""}`.trim() : `${a.type} attachment`,
+          ),
+          message.text,
+        ]
+          .filter(Boolean)
+          .join(". ");
+  const status =
+    message.state === "sending"
+      ? "Sending"
+      : message.state === "failed"
+        ? "Not sent"
+        : receiptStatus === "read"
+          ? "Read"
+          : receiptStatus === "delivered"
+            ? "Delivered"
+            : receiptStatus === "sent"
+              ? "Sent"
+              : "";
+  const reactions = message.reactions?.length
+    ? `Reactions: ${message.reactions.map((r) => r.emoji).join(" ")}`
+    : "";
+  return [who, body, message.edited && !message.deleted ? "edited" : "", time, status, reactions]
+    .filter(Boolean)
+    .join(", ");
+}
+
 export const MessageBubble = ({
   message,
   receiptStatus,
@@ -89,6 +127,26 @@ export const MessageBubble = ({
     return [...counts.entries()].map(([emoji, n]) => (n > 1 ? `${emoji} ${n}` : emoji)).join("  ");
   })();
   const mapsUrl = message.text.match(MAPS_URL_RE)?.[0];
+  const firstImage = message.deleted
+    ? undefined
+    : message.attachments?.find((a) => a.type === "image");
+
+  const accessibilityActions = (() => {
+    if (message.state === "sending" || message.deleted) return [];
+    if (message.state === "failed") {
+      return [{ name: "activate", label: "Retry or delete unsent message" }];
+    }
+    return [
+      { name: "longpress", label: "Message options" },
+      ...(firstImage ? [{ name: "openImage", label: "Open photo" }] : []),
+    ];
+  })();
+
+  const handleAccessibilityAction = (name: string) => {
+    if (name === "longpress") onLongPress?.(message);
+    else if (name === "activate") onPress?.(message);
+    else if (name === "openImage" && firstImage) onImagePress?.(message, firstImage);
+  };
 
   return (
     <View style={[styles.row, message.fromMe && styles.rowFromMe]}>
@@ -110,13 +168,22 @@ export const MessageBubble = ({
         onPress={() => onPress?.(message)}
         onLongPress={() => onLongPress?.(message)}
         delayLongPress={250}
-        disabled={message.status === "sending" || message.deleted}
+        disabled={message.state === "sending" || message.deleted}
+        accessible
+        accessibilityLabel={describeMessage(message, time, receiptStatus)}
+        accessibilityActions={accessibilityActions}
+        onAccessibilityAction={(event) => handleAccessibilityAction(event.nativeEvent.actionName)}
         style={[
           styles.bubble,
           message.fromMe ? styles.bubbleFromMe : styles.bubbleIncoming,
-          message.status === "sending" && styles.bubbleSending,
+          message.state === "sending" && styles.bubbleSending,
         ]}
       >
+        {message.state === "unsupported" && (
+          <StyledText style={{ color: textColor, fontStyle: "italic", opacity: 0.7 }}>
+            Unsupported message. Update the app to view it.
+          </StyledText>
+        )}
         {message.deleted && (
           <StyledText style={{ color: textColor, fontStyle: "italic", opacity: 0.7 }}>
             This message was deleted
@@ -131,7 +198,7 @@ export const MessageBubble = ({
             onLongPress={() => onLongPress?.(message)}
           />
         ))}
-        {message.status === "failed" && (
+        {message.state === "failed" && (
           <StyledText size={12} weight="medium" style={{ color: theme.danger }}>
             Not sent · tap to retry
           </StyledText>

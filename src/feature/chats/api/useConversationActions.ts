@@ -5,20 +5,18 @@ import {
   deleteGroup,
   favoriteConversation,
   leaveGroup,
-  muteConversation,
   removeGroupAvatar,
   removeGroupMember,
   setGroupAvatar,
   transferGroupOwnership,
   unfavoriteConversation,
-  unmuteConversation,
   updateConversationSettings,
   updateGroupConversation,
   updateGroupMemberRole,
 } from "./chatsApi";
 import { clearConversationMessages, markAllRead } from "./messagesApi";
 import { chatKeys } from "./queryKeys";
-import { ConversationResponse, GroupMemberRole, MuteDuration } from "./types";
+import { ConversationResponse, GroupMemberRole } from "./types";
 
 function useInvalidateChats(conversationId?: string) {
   const queryClient = useQueryClient();
@@ -30,22 +28,6 @@ function useInvalidateChats(conversationId?: string) {
       queryClient.invalidateQueries({ queryKey: chatKeys.messages(conversationId) });
     }
   };
-}
-
-export function useMuteConversation(conversationId: string) {
-  const invalidate = useInvalidateChats(conversationId);
-  return useMutation({
-    mutationFn: (duration: MuteDuration) => muteConversation(conversationId, duration),
-    onSuccess: invalidate,
-  });
-}
-
-export function useUnmuteConversation(conversationId: string) {
-  const invalidate = useInvalidateChats(conversationId);
-  return useMutation({
-    mutationFn: () => unmuteConversation(conversationId),
-    onSuccess: invalidate,
-  });
 }
 
 export function useFavoriteConversation(conversationId: string) {

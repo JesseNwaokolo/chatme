@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from "axios";
 import { registerPushDevice, unregisterPushDevice } from "@/src/api/pushDevicesApi";
 import Constants from "expo-constants";
 import * as Crypto from "expo-crypto";
@@ -54,10 +55,10 @@ export async function registerForPushNotifications() {
   });
 }
 
-export async function unregisterFromPushNotifications() {
+export async function unregisterFromPushNotifications(config?: AxiosRequestConfig) {
   try {
     const installationId = await SecureStore.getItemAsync(INSTALLATION_ID_KEY);
-    if (installationId) await unregisterPushDevice(installationId);
+    if (installationId) await unregisterPushDevice(installationId, config);
   } catch {
   }
 }

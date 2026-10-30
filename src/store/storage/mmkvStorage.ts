@@ -3,6 +3,9 @@ import type { StateStorage } from "zustand/middleware";
 
 const mmkv = createMMKV({ id: "user-storage" });
 
+// Mute state used to be persisted on-device and leaked across accounts; the server owns it now.
+mmkv.remove("muted-chats-storage");
+
 export const mmkvStorage: StateStorage = {
   getItem: (name) => mmkv.getString(name) ?? null,
   setItem: (name, value) => mmkv.set(name, value),

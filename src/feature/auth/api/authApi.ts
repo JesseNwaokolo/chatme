@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from "axios";
 import { apiClient } from "@/src/api/client";
 import { endpoints } from "@/src/api/endpoints";
 import {
@@ -25,5 +26,5 @@ export const verifyOtp = (payload: VerifyOtpRequest) =>
     .post<VerifyOtpResponse>(endpoints.auth.verifyOtp, payload)
     .then((res) => res.data);
 
-export const logoutRequest = (payload: LogoutRequest) =>
-  apiClient.post<void>(endpoints.auth.logout, payload).then((res) => res.data);
+export const logoutRequest = (payload: LogoutRequest, config?: AxiosRequestConfig) =>
+  apiClient.post<void>(endpoints.auth.logout, payload, config).then((res) => res.data);
